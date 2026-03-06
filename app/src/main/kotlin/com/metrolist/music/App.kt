@@ -52,9 +52,8 @@ import java.util.Locale
 import javax.inject.Inject
 
 @HiltAndroidApp
-class App :
-    Application(),
-    SingletonImageLoader.Factory {
+class App : Application(), SingletonImageLoader.Factory {
+
     @Inject
     @ApplicationScope
     lateinit var applicationScope: CoroutineScope
@@ -82,18 +81,15 @@ class App :
         val locale = Locale.getDefault()
         val languageTag = locale.language
 
-        YouTube.locale =
-            YouTubeLocale(
-                gl =
-                    settings[ContentCountryKey]?.takeIf { it != SYSTEM_DEFAULT }
-                        ?: locale.country.takeIf { it in CountryCodeToName }
-                        ?: "US",
-                hl =
-                    settings[ContentLanguageKey]?.takeIf { it != SYSTEM_DEFAULT }
-                        ?: locale.language.takeIf { it in LanguageCodeToName }
-                        ?: languageTag.takeIf { it in LanguageCodeToName }
-                        ?: "en",
-            )
+        YouTube.locale = YouTubeLocale(
+            gl = settings[ContentCountryKey]?.takeIf { it != SYSTEM_DEFAULT }
+                ?: locale.country.takeIf { it in CountryCodeToName }
+                ?: "US",
+            hl = settings[ContentLanguageKey]?.takeIf { it != SYSTEM_DEFAULT }
+                ?: locale.language.takeIf { it in LanguageCodeToName }
+                ?: languageTag.takeIf { it in LanguageCodeToName }
+                ?: "en"
+        )
 
         if (languageTag == "zh-TW") {
             KuGou.useTraditionalChinese = true
@@ -102,7 +98,7 @@ class App :
         // Initialize LastFM with API keys from BuildConfig (GitHub Secrets)
         LastFM.initialize(
             apiKey = BuildConfig.LASTFM_API_KEY.takeIf { it.isNotEmpty() } ?: "",
-            secret = BuildConfig.LASTFM_SECRET.takeIf { it.isNotEmpty() } ?: "",
+            secret = BuildConfig.LASTFM_SECRET.takeIf { it.isNotEmpty() } ?: ""
         )
 
         if (settings[ProxyEnabledKey] == true) {
@@ -114,12 +110,10 @@ class App :
                 if (type == Proxy.Type.HTTP) {
                     YouTube.proxyAuth = Credentials.basic(username, password)
                 } else {
-                    Authenticator.setDefault(
-                        object : Authenticator() {
-                            override fun getPasswordAuthentication(): PasswordAuthentication =
-                                PasswordAuthentication(username, password.toCharArray())
-                        },
-                    )
+                    Authenticator.setDefault(object : Authenticator() {
+                        override fun getPasswordAuthentication(): PasswordAuthentication =
+                            PasswordAuthentication(username, password.toCharArray())
+                    })
                 }
             }
             try {
@@ -136,14 +130,13 @@ class App :
 
         YouTube.useLoginForBrowse = settings[UseLoginForBrowse] ?: true
 
-        val channel =
-            NotificationChannel(
-                "updates",
-                getString(R.string.update_channel_name),
-                NotificationManager.IMPORTANCE_DEFAULT,
-            ).apply {
-                description = getString(R.string.update_channel_desc)
-            }
+        val channel = NotificationChannel(
+            "updates",
+            getString(R.string.update_channel_name),
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = getString(R.string.update_channel_desc)
+        }
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(channel)
     }
@@ -168,12 +161,11 @@ class App :
                 .map { it[DataSyncIdKey] }
                 .distinctUntilChanged()
                 .collect { dataSyncId ->
-                    YouTube.dataSyncId =
-                        dataSyncId?.let {
-                            it.takeIf { !it.contains("||") }
-                                ?: it.takeIf { it.endsWith("||") }?.substringBefore("||")
-                                ?: it.substringAfter("||")
-                        }
+                    YouTube.dataSyncId = dataSyncId?.let {
+                        it.takeIf { !it.contains("||") }
+                            ?: it.takeIf { it.endsWith("||") }?.substringBefore("||")
+                            ?: it.substringAfter("||")
+                    }
                 }
         }
 
@@ -210,60 +202,49 @@ class App :
                 .distinctUntilChanged()
                 .collect { (contentCountry, contentLanguage, appLanguage) ->
                     val systemLocale = Locale.getDefault()
-                    val effectiveAppLocale =
-                        appLanguage
-                            ?.takeUnless { it == SYSTEM_DEFAULT }
-                            ?.let { Locale.forLanguageTag(it) }
-                            ?: systemLocale
+                    val effectiveAppLocale = appLanguage
+                        ?.takeUnless { it == SYSTEM_DEFAULT }
+                        ?.let { Locale.forLanguageTag(it) }
+                        ?: systemLocale
 
-                    YouTube.locale =
-                        YouTubeLocale(
-                            gl =
-                                contentCountry?.takeIf { it != SYSTEM_DEFAULT }
-                                    ?: effectiveAppLocale.country.takeIf { it in CountryCodeToName }
-                                    ?: systemLocale.country.takeIf { it in CountryCodeToName }
-                                    ?: "US",
-                            hl =
-                                contentLanguage?.takeIf { it != SYSTEM_DEFAULT }
-                                    ?: effectiveAppLocale.toLanguageTag().takeIf { it in LanguageCodeToName }
-                                    ?: effectiveAppLocale.language.takeIf { it in LanguageCodeToName }
-                                    ?: "en",
-                        )
+                    YouTube.locale = YouTubeLocale(
+                        gl = contentCountry?.takeIf { it != SYSTEM_DEFAULT }
+                            ?: effectiveAppLocale.country.takeIf { it in CountryCodeToName }
+                            ?: systemLocale.country.takeIf { it in CountryCodeToName }
+                            ?: "US",
+                        hl = contentLanguage?.takeIf { it != SYSTEM_DEFAULT }
+                            ?: effectiveAppLocale.toLanguageTag().takeIf { it in LanguageCodeToName }
+                            ?: effectiveAppLocale.language.takeIf { it in LanguageCodeToName }
+                            ?: "en"
+                    )
                 }
         }
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {
-        val cacheSize =
-            runBlocking {
-                dataStore.data.map { it[MaxImageCacheSizeKey] ?: 512 }.first()
+        val cacheSize = runBlocking {
+            dataStore.data.map { it[MaxImageCacheSizeKey] ?: 512 }.first()
+        }
+        return ImageLoader.Builder(this).apply {
+            crossfade(true)
+            allowHardware(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+            // Memory cache for fast image loading (prevents network requests on recomposition)
+            memoryCache {
+                MemoryCache.Builder()
+                    .maxSizePercent(context, 0.25)
+                    .build()
             }
-        return ImageLoader
-            .Builder(this)
-            .apply {
-                crossfade(true)
-                allowHardware(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-                // Memory cache for fast image loading (prevents network requests on recomposition)
-                memoryCache {
-                    MemoryCache
-                        .Builder()
-                        .maxSizePercent(context, 0.25)
+            if (cacheSize == 0) {
+                diskCachePolicy(CachePolicy.DISABLED)
+            } else {
+                diskCache(
+                    DiskCache.Builder()
+                        .directory(cacheDir.resolve("coil"))
+                        .maxSizeBytes(cacheSize * 1024 * 1024L)
                         .build()
-                }
-                if (cacheSize == 0) {
-                    diskCachePolicy(CachePolicy.DISABLED)
-                } else {
-                    diskCache(
-                        DiskCache
-                            .Builder()
-                            .directory(cacheDir.resolve("coil"))
-                            .maxSizeBytes(cacheSize * 1024 * 1024L)
-                            .build(),
-                    )
-                    // Allow reading from disk cache as fallback when network is unavailable
-                    networkCachePolicy(CachePolicy.ENABLED)
-                }
-            }.build()
+                )
+            }
+        }.build()
     }
 
     companion object {
@@ -284,17 +265,11 @@ class App :
 
             // Immediately clear YouTube object's auth state
             Timber.d("forgetAccount: Clearing YouTube object auth state")
-            Timber.d(
-                "forgetAccount: Before - cookie=${YouTube.cookie?.take(
-                    50,
-                )}, visitorData=${YouTube.visitorData?.take(20)}, dataSyncId=${YouTube.dataSyncId?.take(20)}",
-            )
+            Timber.d("forgetAccount: Before - cookie=${YouTube.cookie?.take(50)}, visitorData=${YouTube.visitorData?.take(20)}, dataSyncId=${YouTube.dataSyncId?.take(20)}")
             YouTube.cookie = null
             YouTube.visitorData = null
             YouTube.dataSyncId = null
-            Timber.d(
-                "forgetAccount: After - cookie=${YouTube.cookie}, visitorData=${YouTube.visitorData}, dataSyncId=${YouTube.dataSyncId}",
-            )
+            Timber.d("forgetAccount: After - cookie=${YouTube.cookie}, visitorData=${YouTube.visitorData}, dataSyncId=${YouTube.dataSyncId}")
 
             // Clear WebView cookies to prevent auto-relogin
             Timber.d("forgetAccount: Clearing WebView CookieManager")

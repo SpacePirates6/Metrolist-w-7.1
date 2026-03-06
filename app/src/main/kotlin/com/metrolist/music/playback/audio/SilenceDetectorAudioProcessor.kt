@@ -18,7 +18,6 @@ import kotlin.math.abs
  * is detected, [onLongSilence] is invoked exactly once per silent segment.
  */
 @UnstableApi
-@Suppress("DEPRECATION")
 class SilenceDetectorAudioProcessor(
     private val minSilenceDurationUs: Long = 2_000_000L,
     private val silenceThreshold: Int = 256,
@@ -132,14 +131,12 @@ class SilenceDetectorAudioProcessor(
 
     override fun isEnded(): Boolean = inputEnded && outputBuffer === EMPTY_BUFFER
 
-    @Deprecated("Deprecated in AudioProcessor")
     override fun flush() {
         outputBuffer = EMPTY_BUFFER
         inputEnded = false
         clearSilenceState()
     }
 
-    @Deprecated("Deprecated in AudioProcessor")
     override fun reset() {
         flush()
         sampleRate = 0

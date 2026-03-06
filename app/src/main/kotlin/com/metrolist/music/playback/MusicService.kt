@@ -132,6 +132,31 @@ import com.metrolist.music.constants.PreventDuplicateTracksInQueueKey
 import com.metrolist.music.constants.SimilarContent
 import com.metrolist.music.constants.SkipSilenceInstantKey
 import com.metrolist.music.constants.SkipSilenceKey
+import com.metrolist.music.constants.UpmixBassLevelKey
+import com.metrolist.music.constants.UpmixCenterHpfKey
+import com.metrolist.music.constants.Upmix71DistanceBLKey
+import com.metrolist.music.constants.Upmix71DistanceBRKey
+import com.metrolist.music.constants.Upmix71DistanceFCKey
+import com.metrolist.music.constants.Upmix71DistanceFLKey
+import com.metrolist.music.constants.Upmix71DistanceFRKey
+import com.metrolist.music.constants.Upmix71DistanceLFEKey
+import com.metrolist.music.constants.Upmix71DistanceSLKey
+import com.metrolist.music.constants.Upmix71DistanceSRKey
+import com.metrolist.music.constants.Upmix71TypeBLKey
+import com.metrolist.music.constants.Upmix71TypeBRKey
+import com.metrolist.music.constants.Upmix71TypeFCKey
+import com.metrolist.music.constants.Upmix71TypeFLKey
+import com.metrolist.music.constants.Upmix71TypeFRKey
+import com.metrolist.music.constants.Upmix71TypeLFEKey
+import com.metrolist.music.constants.Upmix71TypeSLKey
+import com.metrolist.music.constants.Upmix71TypeSRKey
+import com.metrolist.music.constants.UpmixCenterLpfKey
+import com.metrolist.music.constants.UpmixEnabledKey
+import com.metrolist.music.constants.UpmixIntensityKey
+import com.metrolist.music.constants.UpmixLfeCutoffKey
+import com.metrolist.music.constants.UpmixModeKey
+import com.metrolist.music.constants.UpmixSurroundHpfKey
+import com.metrolist.music.constants.UpmixSurroundLpfKey
 import com.metrolist.music.db.MusicDatabase
 import com.metrolist.music.db.entities.Event
 import com.metrolist.music.db.entities.FormatEntity
@@ -142,6 +167,8 @@ import com.metrolist.music.di.DownloadCache
 import com.metrolist.music.di.PlayerCache
 import com.metrolist.music.eq.EqualizerService
 import com.metrolist.music.eq.audio.CustomEqualizerAudioProcessor
+import com.metrolist.music.playback.audio.UpmixAudioProcessor
+import com.metrolist.music.playback.audio.UpmixService
 import com.metrolist.music.eq.data.EQProfileRepository
 import com.metrolist.music.extensions.SilentHandler
 import com.metrolist.music.extensions.collect
@@ -232,6 +259,9 @@ class MusicService :
 
     @Inject
     lateinit var equalizerService: EqualizerService
+
+    @Inject
+    lateinit var upmixService: UpmixService
 
     @Inject
     lateinit var eqProfileRepository: EQProfileRepository
@@ -355,6 +385,7 @@ class MusicService :
     val playerFlow = _playerFlow.asStateFlow()
 
     private val playerSilenceProcessors = HashMap<Player, SilenceDetectorAudioProcessor>()
+    private val playerUpmixProcessors = HashMap<Player, UpmixAudioProcessor>()
 
 
     private val instantSilenceSkipEnabled = MutableStateFlow(false)
@@ -979,6 +1010,9 @@ class MusicService :
         val eqProcessor = CustomEqualizerAudioProcessor()
         equalizerService.addAudioProcessor(eqProcessor)
 
+        val upmixProcessor = UpmixAudioProcessor()
+        upmixService.addProcessor(upmixProcessor)
+
         val silenceProcessor = SilenceDetectorAudioProcessor { handleLongSilenceDetected() }
 
         // Set initial state
@@ -986,11 +1020,64 @@ class MusicService :
             val skipSilence = dataStore.get(SkipSilenceKey, false)
             val instantSkip = dataStore.get(SkipSilenceInstantKey, false)
             silenceProcessor.instantModeEnabled = skipSilence && instantSkip
+
+            upmixProcessor.enabled = dataStore.get(UpmixEnabledKey, false)
+            upmixProcessor.surroundIntensity = dataStore.get(
+                UpmixIntensityKey,
+                UpmixAudioProcessor.DEFAULT_SURROUND_INTENSITY,
+            )
+            upmixProcessor.outputMode = dataStore.get(UpmixModeKey)
+                ?.let { runCatching { UpmixAudioProcessor.UpmixMode.valueOf(it) }.getOrNull() }
+                ?: UpmixAudioProcessor.UpmixMode.SURROUND_7_1
+            upmixProcessor.bassLevel = dataStore.get(
+                UpmixBassLevelKey,
+                UpmixAudioProcessor.DEFAULT_BASS_LEVEL,
+            )
+            upmixProcessor.lfeCutoff = dataStore.get(
+                UpmixLfeCutoffKey,
+                UpmixAudioProcessor.DEFAULT_LFE_CUTOFF,
+            )
+            upmixProcessor.centerHpfCutoff = dataStore.get(
+                UpmixCenterHpfKey,
+                UpmixAudioProcessor.DEFAULT_CENTER_HPF_CUTOFF,
+            )
+            upmixProcessor.centerLpfCutoff = dataStore.get(
+                UpmixCenterLpfKey,
+                UpmixAudioProcessor.DEFAULT_CENTER_LPF_CUTOFF,
+            )
+            upmixProcessor.surroundHpfCutoff = dataStore.get(
+                UpmixSurroundHpfKey,
+                UpmixAudioProcessor.DEFAULT_SURROUND_HPF_CUTOFF,
+            )
+            upmixProcessor.surroundLpfCutoff = dataStore.get(
+                UpmixSurroundLpfKey,
+                UpmixAudioProcessor.DEFAULT_SURROUND_LPF_CUTOFF,
+            )
+            upmixProcessor.channelDistances = floatArrayOf(
+                dataStore.get(Upmix71DistanceFLKey, UpmixAudioProcessor.DEFAULT_CHANNEL_DISTANCE),
+                dataStore.get(Upmix71DistanceFRKey, UpmixAudioProcessor.DEFAULT_CHANNEL_DISTANCE),
+                dataStore.get(Upmix71DistanceFCKey, UpmixAudioProcessor.DEFAULT_CHANNEL_DISTANCE),
+                dataStore.get(Upmix71DistanceLFEKey, UpmixAudioProcessor.DEFAULT_CHANNEL_DISTANCE),
+                dataStore.get(Upmix71DistanceBLKey, UpmixAudioProcessor.DEFAULT_CHANNEL_DISTANCE),
+                dataStore.get(Upmix71DistanceBRKey, UpmixAudioProcessor.DEFAULT_CHANNEL_DISTANCE),
+                dataStore.get(Upmix71DistanceSLKey, UpmixAudioProcessor.DEFAULT_CHANNEL_DISTANCE),
+                dataStore.get(Upmix71DistanceSRKey, UpmixAudioProcessor.DEFAULT_CHANNEL_DISTANCE),
+            )
+            upmixProcessor.channelTypes = arrayOf(
+                dataStore.get(Upmix71TypeFLKey, UpmixAudioProcessor.CHANNEL_TYPE_DEFAULT),
+                dataStore.get(Upmix71TypeFRKey, UpmixAudioProcessor.CHANNEL_TYPE_DEFAULT),
+                dataStore.get(Upmix71TypeFCKey, UpmixAudioProcessor.CHANNEL_TYPE_DEFAULT),
+                dataStore.get(Upmix71TypeLFEKey, UpmixAudioProcessor.CHANNEL_TYPE_DEFAULT),
+                dataStore.get(Upmix71TypeBLKey, UpmixAudioProcessor.CHANNEL_TYPE_DEFAULT),
+                dataStore.get(Upmix71TypeBRKey, UpmixAudioProcessor.CHANNEL_TYPE_DEFAULT),
+                dataStore.get(Upmix71TypeSLKey, UpmixAudioProcessor.CHANNEL_TYPE_DEFAULT),
+                dataStore.get(Upmix71TypeSRKey, UpmixAudioProcessor.CHANNEL_TYPE_DEFAULT),
+            )
         }
 
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(createMediaSourceFactory())
-            .setRenderersFactory(createRenderersFactory(eqProcessor, silenceProcessor))
+            .setRenderersFactory(createRenderersFactory(upmixProcessor, eqProcessor, silenceProcessor))
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .setAudioAttributes(
@@ -1006,6 +1093,7 @@ class MusicService :
             .build()
 
         playerSilenceProcessors[player] = silenceProcessor
+        playerUpmixProcessors[player] = upmixProcessor
 
         player.apply {
             runBlocking {
@@ -2945,8 +3033,9 @@ class MusicService :
         )
 
     private fun createRenderersFactory(
+        upmixProcessor: UpmixAudioProcessor,
         eqProcessor: CustomEqualizerAudioProcessor,
-        silenceProcessor: SilenceDetectorAudioProcessor
+        silenceProcessor: SilenceDetectorAudioProcessor,
     ) =
         object : DefaultRenderersFactory(this) {
             override fun buildAudioSink(
@@ -2959,8 +3048,10 @@ class MusicService :
                 .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                 .setAudioProcessorChain(
                     DefaultAudioSink.DefaultAudioProcessorChain(
-                        // 2. Inject processor into audio pipeline
+                        // Upmix first for perfect surround extraction (mid-side matrix on original phase).
+                        // EQ second applies AutoEQ to the surround soundstage; LFE is bypassed.
                         arrayOf(
+                            upmixProcessor,
                             eqProcessor,
                             silenceProcessor,
                         ),
@@ -3117,6 +3208,7 @@ class MusicService :
         player.removeListener(this)
         player.removeListener(sleepTimer)
         playerSilenceProcessors.remove(player)
+        playerUpmixProcessors.remove(player)?.let { upmixService.removeProcessor(it) }
         // Note: equalizerService audio processors are cleared in equalizerService.release() if needed,
         // or we can't easily reference the specific processor created in createExoPlayer here without storing it.
         // But since we are destroying the service, it's fine.

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,7 +26,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -63,8 +61,9 @@ import com.metrolist.music.constants.ScrobbleDelaySecondsKey
 import com.metrolist.music.constants.ScrobbleMinSongDurationKey
 import com.metrolist.music.ui.component.DefaultDialog
 import com.metrolist.music.ui.component.IconButton
-import com.metrolist.music.ui.component.Material3SettingsGroup
-import com.metrolist.music.ui.component.Material3SettingsItem
+import com.metrolist.music.ui.component.PreferenceEntry
+import com.metrolist.music.ui.component.PreferenceGroupTitle
+import com.metrolist.music.ui.component.SwitchPreference
 import com.metrolist.music.ui.utils.backToMain
 import com.metrolist.music.utils.makeTimeString
 import com.metrolist.music.utils.rememberPreference
@@ -78,7 +77,7 @@ import kotlin.math.roundToInt
 fun LastFMSettings(
     navController: NavController,
     scrollBehavior: TopAppBarScrollBehavior,
-) {
+) { 
     val coroutineScope = rememberCoroutineScope()
 
     var lastfmUsername by rememberPreference(LastFMUsernameKey, "")
@@ -128,7 +127,7 @@ fun LastFMSettings(
         var tempPassword by rememberSaveable { mutableStateOf("") }
 
         AlertDialog(
-            onDismissRequest = {
+            onDismissRequest = { 
                 if (!isLoggingIn) {
                     showLoginDialog = false
                     loginError = null
@@ -144,7 +143,7 @@ fun LastFMSettings(
                 ) {
                     OutlinedTextField(
                         value = tempUsername,
-                        onValueChange = {
+                        onValueChange = { 
                             tempUsername = it
                             loginError = null
                         },
@@ -155,7 +154,7 @@ fun LastFMSettings(
                     )
                     OutlinedTextField(
                         value = tempPassword,
-                        onValueChange = {
+                        onValueChange = { 
                             tempPassword = it
                             loginError = null
                         },
@@ -166,7 +165,7 @@ fun LastFMSettings(
                         enabled = !isLoggingIn,
                         modifier = Modifier.fillMaxWidth()
                     )
-
+                    
                     // Show error message if login failed
                     loginError?.let { error ->
                         Text(
@@ -176,7 +175,7 @@ fun LastFMSettings(
                             modifier = Modifier.padding(top = 8.dp)
                         )
                     }
-
+                    
                     // Show loading indicator
                     if (isLoggingIn) {
                         Row(
@@ -203,10 +202,10 @@ fun LastFMSettings(
                             loginError = "Please enter both username and password"
                             return@TextButton
                         }
-
+                        
                         isLoggingIn = true
                         loginError = null
-
+                        
                         coroutineScope.launch(Dispatchers.IO) {
                             try {
                                 LastFM.getMobileSession(tempUsername, tempPassword)
@@ -214,7 +213,7 @@ fun LastFMSettings(
                                         lastfmUsername = auth.session.name
                                         lastfmSession = auth.session.key
                                         LastFM.sessionKey = auth.session.key
-
+                                        
                                         // Switch back to main thread to update UI
                                         coroutineScope.launch(Dispatchers.Main) {
                                             isLoggingIn = false
@@ -226,7 +225,7 @@ fun LastFMSettings(
                                         coroutineScope.launch(Dispatchers.Main) {
                                             isLoggingIn = false
                                             loginError = when (exception) {
-                                                is LastFM.LastFmException -> {
+                                                is com.metrolist.lastfm.LastFM.LastFmException -> {
                                                     when (exception.code) {
                                                         4 -> "Invalid username or password"
                                                         6 -> "Invalid parameters"
@@ -274,14 +273,9 @@ fun LastFMSettings(
     }
 
     Column(
-        modifier = Modifier
-            .windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
-                )
-            )
+        Modifier
+            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
     ) {
         Spacer(
             Modifier.windowInsetsPadding(
@@ -291,79 +285,65 @@ fun LastFMSettings(
             )
         )
 
-        // Options section (card-based)
-        Material3SettingsGroup(
+        PreferenceGroupTitle(
             title = stringResource(R.string.account),
-            items = listOf(
-                Material3SettingsItem(
-                    title = {
-                        Text(
-                            text = if (isLoggedIn) lastfmUsername else stringResource(R.string.not_logged_in),
-                            modifier = Modifier.alpha(if (isLoggedIn) 1f else 0.5f),
-                        )
-                    },
-                    trailingContent = {
-                        if (isLoggedIn) {
-                            OutlinedButton(onClick = {
-                                lastfmSession = ""
-                                lastfmUsername = ""
-                            }) {
-                                Text(stringResource(R.string.action_logout))
-                            }
-                        } else {
-                            OutlinedButton(onClick = { showLoginDialog = true }) {
-                                Text(stringResource(R.string.action_login))
-                            }
-                        }
-                    },
-                    icon = painterResource(R.drawable.music_note)
-                ),
-            )
         )
 
-        Spacer(Modifier.height(8.dp))
-
-        Material3SettingsGroup(
-            title = stringResource(R.string.options),
-            items = listOf(
-                Material3SettingsItem(
-                    title = { Text(stringResource(R.string.enable_scrobbling)) },
-                    trailingContent = {
-                        Switch(
-                            checked = lastfmScrobbling,
-                            onCheckedChange = onlastfmScrobblingChange,
-                            enabled = isLoggedIn,
-                        )
-                    },
-                    enabled = isLoggedIn,
-                    icon = painterResource(R.drawable.queue_music)
-                ),
-                Material3SettingsItem(
-                    title = { Text(stringResource(R.string.lastfm_now_playing)) },
-                    trailingContent = {
-                        Switch(
-                            checked = useNowPlaying,
-                            onCheckedChange = onUseNowPlayingChange,
-                            enabled = isLoggedIn && lastfmScrobbling,
-                        )
-                    },
-                    enabled = isLoggedIn && lastfmScrobbling,
-                    icon = painterResource(R.drawable.play)
-                ),
-                Material3SettingsItem(
-                    title = { Text(stringResource(R.string.last_fm_send_likes)) },
-                    description = { stringResource(R.string.last_fm_send_likes_description) },
-                    trailingContent = {
-                        Switch(
-                            checked = useSendLikes,
-                            onCheckedChange = onUseSendLikes,
-                            enabled = isLoggedIn,
-                        )
-                    },
-                    enabled = isLoggedIn,
-                    icon = painterResource(R.drawable.media3_icon_thumb_up_unfilled)
+        PreferenceEntry(
+            title = {
+                Text(
+                    text = if (isLoggedIn) lastfmUsername else stringResource(R.string.not_logged_in),
+                    modifier = Modifier.alpha(if (isLoggedIn) 1f else 0.5f),
                 )
-            )
+            },
+            description = null,
+            icon = { Icon(painterResource(R.drawable.music_note), null) },
+            trailingContent = {
+                if (isLoggedIn) {
+                    OutlinedButton(onClick = {
+                        lastfmSession = ""
+                        lastfmUsername = ""
+                    }) {
+                        Text(stringResource(R.string.action_logout))
+                    }
+                } else {
+                    OutlinedButton(onClick = {
+                        showLoginDialog = true
+                    }) {
+                        Text(stringResource(R.string.action_login))
+                    }
+                }
+            },
+        )
+
+        PreferenceGroupTitle(
+            title = stringResource(R.string.options),
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.enable_scrobbling)) },
+            checked = lastfmScrobbling,
+            onCheckedChange = onlastfmScrobblingChange,
+            isEnabled = isLoggedIn,
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.lastfm_now_playing)) },
+            checked = useNowPlaying,
+            onCheckedChange = onUseNowPlayingChange,
+            isEnabled = isLoggedIn && lastfmScrobbling,
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.last_fm_send_likes)) },
+            description = stringResource(R.string.last_fm_send_likes_description),
+            checked = useSendLikes,
+            onCheckedChange = onUseSendLikes,
+            isEnabled = isLoggedIn,
+        )
+
+        PreferenceGroupTitle(
+            title = stringResource(R.string.scrobbling_configuration)
         )
 
         var showMinTrackDurationDialog by rememberSaveable { mutableStateOf(false) }
@@ -431,6 +411,12 @@ fun LastFMSettings(
             }
         }
 
+        PreferenceEntry(
+            title = { Text(stringResource(R.string.scrobble_min_track_duration)) },
+            description = makeTimeString((minTrackDuration * 1000).toLong()),
+            onClick = { showMinTrackDurationDialog = true }
+        )
+
         var showScrobbleDelayPercentDialog by rememberSaveable { mutableStateOf(false) }
 
         if (showScrobbleDelayPercentDialog) {
@@ -495,6 +481,12 @@ fun LastFMSettings(
                 }
             }
         }
+
+        PreferenceEntry(
+            title = { Text(stringResource(R.string.scrobble_delay_percent)) },
+            description = stringResource(R.string.sensitivity_percentage, (scrobbleDelayPercent * 100).roundToInt()),
+            onClick = { showScrobbleDelayPercentDialog = true }
+        )
 
         var showScrobbleDelaySecondsDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -561,30 +553,10 @@ fun LastFMSettings(
             }
         }
 
-        Spacer(Modifier.height(8.dp))
-
-        Material3SettingsGroup(
-            title = stringResource(R.string.scrobbling_configuration),
-            items = listOf(
-                Material3SettingsItem(
-                    title = { Text(stringResource(R.string.scrobble_min_track_duration)) },
-                    description = { Text(makeTimeString((minTrackDuration * 1000).toLong())) },
-                    onClick = { showMinTrackDurationDialog = true },
-                    icon = painterResource(R.drawable.timer)
-                ),
-                Material3SettingsItem(
-                    title = { Text(stringResource(R.string.scrobble_delay_percent)) },
-                    description = { Text(stringResource(R.string.sensitivity_percentage, (scrobbleDelayPercent * 100).roundToInt())) },
-                    onClick = { showScrobbleDelayPercentDialog = true },
-                    icon = painterResource(R.drawable.timer)
-                ),
-                Material3SettingsItem(
-                    title = { Text(stringResource(R.string.scrobble_delay_minutes)) },
-                    description = { Text(makeTimeString((scrobbleDelaySeconds * 1000).toLong())) },
-                    onClick = { showScrobbleDelaySecondsDialog = true },
-                    icon = painterResource(R.drawable.timer)
-                ),
-            )
+        PreferenceEntry(
+            title = { Text(stringResource(R.string.scrobble_delay_minutes)) },
+            description = makeTimeString((scrobbleDelaySeconds * 1000).toLong()),
+            onClick = { showScrobbleDelaySecondsDialog = true }
         )
     }
 

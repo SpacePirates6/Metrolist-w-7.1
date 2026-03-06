@@ -215,16 +215,8 @@
     <string name="minimum_playback_duration">Minimum playback duration</string>
 
     <string name="import_online">Import a \"m3u\" playlists</string>
-    <string name="import_csv">Import a "csv" playlists</string>
+    <string name="import_csv">Import a \"csv\" playlists</string>
     <string name="playlist_add_local_to_synced_note">Note: Adding local songs to synced/remote playlists is unsupported. Any other combination is valid</string>
-    <string name="export_playlist">Export playlist</string>
-    <string name="export_as_csv">Export as CSV</string>
-    <string name="export_as_m3u">Export as M3U</string>
-    <string name="export_success">Playlist exported successfully</string>
-    <string name="export_failed">Failed to export playlist</string>
-    <string name="export_option_share">Share</string>
-    <string name="export_option_save">Save to Documents</string>
-    <string name="export_option_title">How would you like to export the playlist?</string>
 
     <string name="auto_download_on_like">Auto download on like</string>
     <string name="auto_download_on_like_desc">Automatically download songs when you like them</string>
@@ -497,6 +489,19 @@
     <string name="error_title">Error</string>
     <string name="error_eq_apply_failed">Failed to apply EQ profile: %1$s</string>
 
+    <!-- AutoEq -->
+    <string name="autoeq_title">AutoEq</string>
+    <string name="autoeq_subtitle">Search and apply headphone EQ profiles</string>
+    <string name="autoeq_hardware_title">Hardware AutoEq</string>
+    <string name="autoeq_no_profile_loaded">No headphone profile loaded</string>
+    <string name="autoeq_active_profile">Active: %1$s</string>
+    <string name="autoeq_find_headphones">Find My Headphones</string>
+    <string name="autoeq_change_headphones">Change Headphone Model</string>
+    <string name="autoeq_search_hint">Search headphone model</string>
+    <string name="autoeq_search_placeholder">Search by brand or model…</string>
+    <string name="autoeq_search_desc">Search</string>
+    <string name="autoeq_apply">Apply</string>
+
     <!-- Hardcoded strings -->
     <string name="found_in_settings_content">Found in Settings &gt; Content</string>
     <string name="plays">plays</string>
@@ -766,7 +771,6 @@
     <string name="hold_to_recognize">Hold search icon to recognize music</string>
     <string name="play_on_app">Play on Metrolist</string>
     <string name="recognized_track">Recognized Track</string>
-    <string name="qs_tile_music_recognizer">Recognize Music</string>
 
     <!-- CSV Import Strings -->
     <string name="map_csv_columns">Map CSV Columns</string>
@@ -922,4 +926,36 @@
     <string name="delete_uploaded_songs_confirm">Are you sure you want to delete %1$d uploaded songs? This cannot be undone.</string>
     <string name="deleted_n_songs">Deleted %1$d songs</string>
     <string name="deleting">Deleting…</string>
+
+    <!-- Upmix (surround) -->
+    <string name="upmix_title">Surround Upmix</string>
+    <string name="upmix_subtitle">Expand stereo audio to 5.1 or 7.1 surround channels</string>
+    <string name="upmix_mode_label">Output format</string>
+    <string name="upmix_mode_5_1">5.1</string>
+    <string name="upmix_mode_7_1">7.1</string>
+    <string name="upmix_intensity_label">Surround intensity</string>
+    <string name="upmix_bass_level">Subwoofer (LFE) bass</string>
+    <string name="upmix_lfe_crossover">LFE crossover</string>
+    <string name="upmix_center_hpf">Center channel HPF</string>
+    <string name="upmix_surround_lpf">Surround ambience LPF</string>
+
+    <!-- 7.1 Channel routing -->
+    <string name="upmix_71_channels_group">7.1 channel routing</string>
+    <string name="upmix_71_ch_fl">Front Left (FL)</string>
+    <string name="upmix_71_ch_fr">Front Right (FR)</string>
+    <string name="upmix_71_ch_fc">Center (FC)</string>
+    <string name="upmix_71_ch_lfe">Subwoofer (LFE)</string>
+    <string name="upmix_71_ch_bl">Back Left (BL)</string>
+    <string name="upmix_71_ch_br">Back Right (BR)</string>
+    <string name="upmix_71_ch_sl">Side Left (SL)</string>
+    <string name="upmix_71_ch_sr">Side Right (SR)</string>
+    <string name="upmix_71_distance">Distance</string>
+    <string name="upmix_71_distance_value">%1$.1f</string>
+    <string name="upmix_71_audio_type">Audio type</string>
+    <string name="upmix_71_type_default">Default</string>
+    <string name="upmix_71_type_full_mix">Full mix</string>
+    <string name="upmix_71_type_ambient">Ambient</string>
+    <string name="upmix_71_type_vocal">Vocal</string>
+    <string name="upmix_71_type_bass">Bass</string>
+    <string name="upmix_71_type_silent">Silent</string>
 </resources>

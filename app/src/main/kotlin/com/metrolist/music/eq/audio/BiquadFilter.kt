@@ -170,6 +170,19 @@ class BiquadFilter(
     }
 
     /**
+     * Process a single sample through the right channel only.
+     * Used for per-channel routing in 5.1/7.1.
+     */
+    fun processRightSample(input: Double): Double {
+        val output = b0 * input + b1 * x1R + b2 * x2R - a1 * y1R - a2 * y2R
+        x2R = x1R
+        x1R = input
+        y2R = y1R
+        y1R = output
+        return output
+    }
+
+    /**
      * Process stereo samples (left and right channels)
      */
     fun processStereo(inputLeft: Double, inputRight: Double): Pair<Double, Double> {
