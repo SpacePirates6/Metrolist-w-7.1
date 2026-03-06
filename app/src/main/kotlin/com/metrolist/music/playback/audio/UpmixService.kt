@@ -8,6 +8,7 @@ package com.metrolist.music.playback.audio
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import timber.log.Timber
+import java.util.concurrent.CopyOnWriteArrayList
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,7 +16,7 @@ import javax.inject.Singleton
 class UpmixService @Inject constructor() {
 
     @OptIn(UnstableApi::class)
-    private val processors = mutableListOf<UpmixAudioProcessor>()
+    private val processors = CopyOnWriteArrayList<UpmixAudioProcessor>()
 
     private var pendingEnabled: Boolean = false
     private var pendingSurroundIntensity: Float = UpmixAudioProcessor.DEFAULT_SURROUND_INTENSITY

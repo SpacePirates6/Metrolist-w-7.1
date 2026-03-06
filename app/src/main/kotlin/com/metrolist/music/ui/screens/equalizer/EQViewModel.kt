@@ -23,6 +23,7 @@ import com.metrolist.music.constants.Upmix71TypeFRKey
 import com.metrolist.music.constants.Upmix71TypeLFEKey
 import com.metrolist.music.constants.Upmix71TypeSLKey
 import com.metrolist.music.constants.Upmix71TypeSRKey
+import com.metrolist.music.constants.UpmixCenterFocusKey
 import com.metrolist.music.constants.UpmixBassLevelKey
 import com.metrolist.music.constants.UpmixCenterHpfKey
 import com.metrolist.music.constants.UpmixCenterLpfKey
@@ -254,6 +255,7 @@ class EQViewModel @Inject constructor(
                 prefs.remove(UpmixEnabledKey)
                 prefs.remove(UpmixIntensityKey)
                 prefs.remove(UpmixModeKey)
+                prefs.remove(UpmixCenterFocusKey)
                 prefs.remove(UpmixBassLevelKey)
                 prefs.remove(UpmixLfeCutoffKey)
                 prefs.remove(UpmixCenterHpfKey)
@@ -293,6 +295,7 @@ class EQViewModel @Inject constructor(
                     runCatching { UpmixAudioProcessor.UpmixMode.valueOf(it) }.getOrNull()
                 } ?: UpmixAudioProcessor.UpmixMode.SURROUND_7_1
 
+                val centerFocus = prefs[UpmixCenterFocusKey] ?: UpmixAudioProcessor.DEFAULT_CENTER_FOCUS
                 val bassLevel = prefs[UpmixBassLevelKey] ?: UpmixAudioProcessor.DEFAULT_BASS_LEVEL
                 val lfeCutoff = prefs[UpmixLfeCutoffKey] ?: UpmixAudioProcessor.DEFAULT_LFE_CUTOFF
                 val centerHpf = prefs[UpmixCenterHpfKey] ?: UpmixAudioProcessor.DEFAULT_CENTER_HPF_CUTOFF
@@ -324,6 +327,7 @@ class EQViewModel @Inject constructor(
                 upmixService.setEnabled(enabled)
                 upmixService.setSurroundIntensity(intensity)
                 upmixService.setOutputMode(mode)
+                upmixService.setCenterFocus(centerFocus)
                 upmixService.setBassLevel(bassLevel)
                 upmixService.setLfeCutoff(lfeCutoff)
                 upmixService.setCenterCutoffs(centerHpf, centerLpf)
@@ -336,6 +340,7 @@ class EQViewModel @Inject constructor(
                         upmixEnabled = enabled,
                         upmixIntensity = intensity,
                         upmixMode = mode,
+                        upmixCenterFocus = centerFocus,
                         upmixBassLevel = bassLevel,
                         upmixLfeCutoff = lfeCutoff,
                         upmixCenterHpf = centerHpf,
@@ -372,6 +377,12 @@ class EQViewModel @Inject constructor(
     fun setUpmixMode(mode: UpmixAudioProcessor.UpmixMode) {
         viewModelScope.launch {
             context.dataStore.edit { it[UpmixModeKey] = mode.name }
+        }
+    }
+
+    fun setUpmixCenterFocus(focus: Float) {
+        viewModelScope.launch {
+            context.dataStore.edit { it[UpmixCenterFocusKey] = focus.coerceIn(0f, 1f) }
         }
     }
 

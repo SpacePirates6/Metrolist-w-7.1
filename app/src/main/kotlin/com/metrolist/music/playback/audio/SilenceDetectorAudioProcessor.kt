@@ -28,6 +28,7 @@ class SilenceDetectorAudioProcessor(
     private var channelCount = 0
     private var encoding = C.ENCODING_INVALID
 
+    private var buffer: ByteBuffer = EMPTY_BUFFER
     private var outputBuffer: ByteBuffer = EMPTY_BUFFER
     private var inputEnded = false
 
@@ -69,9 +70,15 @@ class SilenceDetectorAudioProcessor(
             clearSilenceState()
         }
 
-        val out = replaceOutputBuffer(inputBuffer.remaining())
-        out.put(inputBuffer)
-        out.flip()
+        val size = inputBuffer.remaining()
+        if (buffer.capacity() < size) {
+            buffer = ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
+        } else {
+            buffer.clear()
+        }
+        buffer.put(inputBuffer)
+        buffer.flip()
+        outputBuffer = buffer
     }
 
     private fun detectSilence(inputBuffer: ByteBuffer) {
@@ -134,23 +141,16 @@ class SilenceDetectorAudioProcessor(
     override fun flush() {
         outputBuffer = EMPTY_BUFFER
         inputEnded = false
+        buffer.clear()
         clearSilenceState()
     }
 
     override fun reset() {
         flush()
+        buffer = EMPTY_BUFFER
         sampleRate = 0
         channelCount = 0
         encoding = C.ENCODING_INVALID
-    }
-
-    private fun replaceOutputBuffer(size: Int): ByteBuffer {
-        if (outputBuffer.capacity() < size) {
-            outputBuffer = ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
-        } else {
-            outputBuffer.clear()
-        }
-        return outputBuffer
     }
 
     companion object {

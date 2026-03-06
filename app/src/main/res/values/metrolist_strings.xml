@@ -937,11 +937,16 @@
     <string name="upmix_intensity_label">Surround intensity</string>
     <string name="upmix_bass_level">Subwoofer (LFE) bass</string>
     <string name="upmix_lfe_crossover">LFE crossover</string>
+    <string name="upmix_center_focus">Center focus</string>
     <string name="upmix_center_hpf">Center channel HPF</string>
+    <string name="upmix_center_lpf">Center channel LPF</string>
+    <string name="upmix_surround_hpf">Surround ambience HPF</string>
     <string name="upmix_surround_lpf">Surround ambience LPF</string>
+    <string name="upmix_mode_change_note">Mode change applies on next track or seek</string>
+    <string name="upmix_51_fold_note">Folded with %1$s in 5.1 mode</string>
 
     <!-- 7.1 Channel routing -->
-    <string name="upmix_71_channels_group">7.1 channel routing</string>
+    <string name="upmix_71_channels_group">Channel routing</string>
     <string name="upmix_71_ch_fl">Front Left (FL)</string>
     <string name="upmix_71_ch_fr">Front Right (FR)</string>
     <string name="upmix_71_ch_fc">Center (FC)</string>

@@ -119,17 +119,27 @@ fun EqScreen(viewModel: EQViewModel = hiltViewModel()) {
                     enabled = state.upmixEnabled,
                     intensity = state.upmixIntensity,
                     mode = state.upmixMode,
+                    centerFocus = state.upmixCenterFocus,
                     bassLevel = state.upmixBassLevel,
                     lfeCutoff = state.upmixLfeCutoff,
                     centerHpf = state.upmixCenterHpf,
+                    centerLpf = state.upmixCenterLpf,
+                    surroundHpf = state.upmixSurroundHpf,
                     surroundLpf = state.upmixSurroundLpf,
                     onEnabledChanged = { viewModel.setUpmixEnabled(it) },
                     onIntensityChanged = { viewModel.setUpmixIntensity(it) },
                     onModeChanged = { viewModel.setUpmixMode(it) },
+                    onCenterFocusChanged = { viewModel.setUpmixCenterFocus(it) },
                     onBassLevelChanged = { viewModel.setUpmixBassLevel(it) },
                     onLfeCutoffChanged = { viewModel.setUpmixLfeCutoff(it) },
                     onCenterHpfChanged = {
                         viewModel.setUpmixCenterCutoffs(it, state.upmixCenterLpf)
+                    },
+                    onCenterLpfChanged = {
+                        viewModel.setUpmixCenterCutoffs(state.upmixCenterHpf, it)
+                    },
+                    onSurroundHpfChanged = {
+                        viewModel.setUpmixSurroundCutoffs(it, state.upmixSurroundLpf)
                     },
                     onSurroundLpfChanged = {
                         viewModel.setUpmixSurroundCutoffs(state.upmixSurroundHpf, it)
@@ -273,16 +283,22 @@ private fun UpmixSection(
     enabled: Boolean,
     intensity: Float,
     mode: UpmixAudioProcessor.UpmixMode,
+    centerFocus: Float,
     bassLevel: Float,
     lfeCutoff: Float,
     centerHpf: Float,
+    centerLpf: Float,
+    surroundHpf: Float,
     surroundLpf: Float,
     onEnabledChanged: (Boolean) -> Unit,
     onIntensityChanged: (Float) -> Unit,
     onModeChanged: (UpmixAudioProcessor.UpmixMode) -> Unit,
+    onCenterFocusChanged: (Float) -> Unit,
     onBassLevelChanged: (Float) -> Unit,
     onLfeCutoffChanged: (Float) -> Unit,
     onCenterHpfChanged: (Float) -> Unit,
+    onCenterLpfChanged: (Float) -> Unit,
+    onSurroundHpfChanged: (Float) -> Unit,
     onSurroundLpfChanged: (Float) -> Unit,
 ) {
     Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)) {
@@ -329,6 +345,12 @@ private fun UpmixSection(
                         label = { Text(stringResource(R.string.upmix_mode_7_1)) },
                     )
                 }
+                Text(
+                    text = stringResource(R.string.upmix_mode_change_note),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -337,6 +359,13 @@ private fun UpmixSection(
                     value = intensity,
                     range = 0f..1f,
                     onValueChange = onIntensityChanged,
+                    formatValue = { "${(it * 100).toInt()}%" },
+                )
+                SliderRow(
+                    label = stringResource(R.string.upmix_center_focus),
+                    value = centerFocus,
+                    range = 0f..1f,
+                    onValueChange = onCenterFocusChanged,
                     formatValue = { "${(it * 100).toInt()}%" },
                 )
                 SliderRow(
@@ -361,6 +390,20 @@ private fun UpmixSection(
                     formatValue = { "${it.toInt()} Hz" },
                 )
                 SliderRow(
+                    label = stringResource(R.string.upmix_center_lpf),
+                    value = centerLpf,
+                    range = 1000f..15000f,
+                    onValueChange = onCenterLpfChanged,
+                    formatValue = { "${it.toInt()} Hz" },
+                )
+                SliderRow(
+                    label = stringResource(R.string.upmix_surround_hpf),
+                    value = surroundHpf,
+                    range = 40f..500f,
+                    onValueChange = onSurroundHpfChanged,
+                    formatValue = { "${it.toInt()} Hz" },
+                )
+                SliderRow(
                     label = stringResource(R.string.upmix_surround_lpf),
                     value = surroundLpf,
                     range = 2000f..15000f,
@@ -378,7 +421,7 @@ private fun UpmixSection(
                     Text(stringResource(R.string.upmix_71_channels_group))
                 }
                 AnimatedVisibility(visible = isChannelConfigExpanded) {
-                    UpmixChannelConfiguration()
+                    UpmixChannelConfiguration(mode = mode)
                 }
             }
         }
@@ -391,6 +434,7 @@ private data class ChannelDef(
     val nameRes: Int,
     val distanceKey: Preferences.Key<Float>,
     val typeKey: Preferences.Key<String>,
+    val foldPartnerRes: Int? = null,
 )
 
 private val UPMIX_CHANNELS = listOf(
@@ -398,23 +442,31 @@ private val UPMIX_CHANNELS = listOf(
     ChannelDef(R.string.upmix_71_ch_fr, Upmix71DistanceFRKey, Upmix71TypeFRKey),
     ChannelDef(R.string.upmix_71_ch_fc, Upmix71DistanceFCKey, Upmix71TypeFCKey),
     ChannelDef(R.string.upmix_71_ch_lfe, Upmix71DistanceLFEKey, Upmix71TypeLFEKey),
-    ChannelDef(R.string.upmix_71_ch_bl, Upmix71DistanceBLKey, Upmix71TypeBLKey),
-    ChannelDef(R.string.upmix_71_ch_br, Upmix71DistanceBRKey, Upmix71TypeBRKey),
-    ChannelDef(R.string.upmix_71_ch_sl, Upmix71DistanceSLKey, Upmix71TypeSLKey),
-    ChannelDef(R.string.upmix_71_ch_sr, Upmix71DistanceSRKey, Upmix71TypeSRKey),
+    ChannelDef(R.string.upmix_71_ch_bl, Upmix71DistanceBLKey, Upmix71TypeBLKey, R.string.upmix_71_ch_sl),
+    ChannelDef(R.string.upmix_71_ch_br, Upmix71DistanceBRKey, Upmix71TypeBRKey, R.string.upmix_71_ch_sr),
+    ChannelDef(R.string.upmix_71_ch_sl, Upmix71DistanceSLKey, Upmix71TypeSLKey, R.string.upmix_71_ch_bl),
+    ChannelDef(R.string.upmix_71_ch_sr, Upmix71DistanceSRKey, Upmix71TypeSRKey, R.string.upmix_71_ch_br),
 )
 
 @Composable
-private fun UpmixChannelConfiguration() {
+private fun UpmixChannelConfiguration(mode: UpmixAudioProcessor.UpmixMode) {
+    val is51 = mode == UpmixAudioProcessor.UpmixMode.SURROUND_5_1
     Material3SettingsGroup(
         title = null,
-        items = UPMIX_CHANNELS.map { ch -> UpmixChannelSettingsItem(ch) },
+        items = UPMIX_CHANNELS.map { ch ->
+            val foldNote = if (is51 && ch.foldPartnerRes != null) {
+                stringResource(R.string.upmix_51_fold_note, stringResource(ch.foldPartnerRes))
+            } else {
+                null
+            }
+            UpmixChannelSettingsItem(ch, foldNote)
+        },
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun UpmixChannelSettingsItem(ch: ChannelDef): Material3SettingsItem {
+private fun UpmixChannelSettingsItem(ch: ChannelDef, foldNote: String?): Material3SettingsItem {
     val (distance, onDistanceChange) = rememberPreference(
         ch.distanceKey,
         defaultValue = UpmixAudioProcessor.DEFAULT_CHANNEL_DISTANCE,
@@ -428,6 +480,14 @@ private fun UpmixChannelSettingsItem(ch: ChannelDef): Material3SettingsItem {
         title = { Text(stringResource(ch.nameRes)) },
         description = {
             Column(modifier = Modifier.fillMaxWidth()) {
+                if (foldNote != null) {
+                    Text(
+                        text = foldNote,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                }
                 Text(
                     text = stringResource(R.string.upmix_71_distance),
                     style = MaterialTheme.typography.bodySmall,

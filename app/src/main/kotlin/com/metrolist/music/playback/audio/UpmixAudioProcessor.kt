@@ -232,14 +232,14 @@ class UpmixAudioProcessor : AudioProcessor {
                 blDefault, brDefault, slDefault, srDefault
             )
 
-            val fl  = routeChannel(types[CH_FL],  defaults[CH_FL],  left, right, mid, side, lfeFiltered) * distGains[CH_FL]
-            val fr  = routeChannel(types[CH_FR],  defaults[CH_FR],  left, right, mid, side, lfeFiltered) * distGains[CH_FR]
-            val fc  = routeChannel(types[CH_FC],  defaults[CH_FC],  left, right, mid, side, lfeFiltered) * distGains[CH_FC]
-            val lfeOutput = routeChannel(types[CH_LFE], defaults[CH_LFE], left, right, mid, side, lfeFiltered) * distGains[CH_LFE]
-            val bl  = routeChannel(types[CH_BL],  defaults[CH_BL],  left, right, mid, side, lfeFiltered) * distGains[CH_BL]
-            val br  = routeChannel(types[CH_BR],  defaults[CH_BR],  left, right, mid, side, lfeFiltered) * distGains[CH_BR]
-            val sl  = routeChannel(types[CH_SL],  defaults[CH_SL],  left, right, mid, side, lfeFiltered) * distGains[CH_SL]
-            val sr  = routeChannel(types[CH_SR],  defaults[CH_SR],  left, right, mid, side, lfeFiltered) * distGains[CH_SR]
+            val fl  = routeChannel(types[CH_FL],  defaults[CH_FL],  mid, scaledSide, centerFiltered, lfeFiltered) * distGains[CH_FL]
+            val fr  = routeChannel(types[CH_FR],  defaults[CH_FR],  mid, scaledSide, centerFiltered, lfeFiltered) * distGains[CH_FR]
+            val fc  = routeChannel(types[CH_FC],  defaults[CH_FC],  mid, scaledSide, centerFiltered, lfeFiltered) * distGains[CH_FC]
+            val lfeOutput = routeChannel(types[CH_LFE], defaults[CH_LFE], mid, scaledSide, centerFiltered, lfeFiltered) * distGains[CH_LFE]
+            val bl  = routeChannel(types[CH_BL],  defaults[CH_BL],  mid, scaledSide, centerFiltered, lfeFiltered) * distGains[CH_BL]
+            val br  = routeChannel(types[CH_BR],  defaults[CH_BR],  mid, scaledSide, centerFiltered, lfeFiltered) * distGains[CH_BR]
+            val sl  = routeChannel(types[CH_SL],  defaults[CH_SL],  mid, scaledSide, centerFiltered, lfeFiltered) * distGains[CH_SL]
+            val sr  = routeChannel(types[CH_SR],  defaults[CH_SR],  mid, scaledSide, centerFiltered, lfeFiltered) * distGains[CH_SR]
 
             buffer.putShort(clampToShort(fl))
             buffer.putShort(clampToShort(fr))
@@ -393,15 +393,14 @@ class UpmixAudioProcessor : AudioProcessor {
     private fun routeChannel(
         type: String,
         defaultValue: Float,
-        left: Float,
-        right: Float,
         mid: Float,
-        side: Float,
+        scaledSide: Float,
+        centerFiltered: Float,
         lfeFiltered: Float,
     ): Float = when (type) {
-        CHANNEL_TYPE_FULL_MIX -> (left + right) * 0.5f
-        CHANNEL_TYPE_AMBIENT -> side
-        CHANNEL_TYPE_VOCAL -> mid
+        CHANNEL_TYPE_FULL_MIX -> mid
+        CHANNEL_TYPE_AMBIENT -> scaledSide
+        CHANNEL_TYPE_VOCAL -> centerFiltered
         CHANNEL_TYPE_BASS -> lfeFiltered
         CHANNEL_TYPE_SILENT -> 0f
         else -> defaultValue

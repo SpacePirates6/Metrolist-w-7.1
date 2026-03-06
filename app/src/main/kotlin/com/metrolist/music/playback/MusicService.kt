@@ -132,6 +132,7 @@ import com.metrolist.music.constants.PreventDuplicateTracksInQueueKey
 import com.metrolist.music.constants.SimilarContent
 import com.metrolist.music.constants.SkipSilenceInstantKey
 import com.metrolist.music.constants.SkipSilenceKey
+import com.metrolist.music.constants.UpmixCenterFocusKey
 import com.metrolist.music.constants.UpmixBassLevelKey
 import com.metrolist.music.constants.UpmixCenterHpfKey
 import com.metrolist.music.constants.Upmix71DistanceBLKey
@@ -1029,6 +1030,10 @@ class MusicService :
             upmixProcessor.outputMode = dataStore.get(UpmixModeKey)
                 ?.let { runCatching { UpmixAudioProcessor.UpmixMode.valueOf(it) }.getOrNull() }
                 ?: UpmixAudioProcessor.UpmixMode.SURROUND_7_1
+            upmixProcessor.centerFocus = dataStore.get(
+                UpmixCenterFocusKey,
+                UpmixAudioProcessor.DEFAULT_CENTER_FOCUS,
+            )
             upmixProcessor.bassLevel = dataStore.get(
                 UpmixBassLevelKey,
                 UpmixAudioProcessor.DEFAULT_BASS_LEVEL,
