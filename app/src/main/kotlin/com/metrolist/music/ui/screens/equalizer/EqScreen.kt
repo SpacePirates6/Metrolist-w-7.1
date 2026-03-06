@@ -1,15 +1,8 @@
 package com.metrolist.music.ui.screens.equalizer
 
-import android.annotation.SuppressLint
-import android.content.Intent
-import android.media.audiofx.AudioEffect
-import android.media.session.PlaybackState
-import android.provider.OpenableColumns
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -18,27 +11,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -51,20 +40,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import kotlin.ranges.ClosedFloatingPointRange
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.metrolist.music.LocalPlayerConnection
-import com.metrolist.music.R
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.datastore.preferences.core.Preferences
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.metrolist.music.R
 import com.metrolist.music.constants.Upmix71DistanceBLKey
 import com.metrolist.music.constants.Upmix71DistanceBRKey
 import com.metrolist.music.constants.Upmix71DistanceFCKey
@@ -81,193 +63,17 @@ import com.metrolist.music.constants.Upmix71TypeFRKey
 import com.metrolist.music.constants.Upmix71TypeLFEKey
 import com.metrolist.music.constants.Upmix71TypeSLKey
 import com.metrolist.music.constants.Upmix71TypeSRKey
-import com.metrolist.music.eq.data.AutoEqMatch
-import com.metrolist.music.eq.data.SavedEQProfile
 import com.metrolist.music.playback.audio.UpmixAudioProcessor
 import com.metrolist.music.ui.component.Material3SettingsGroup
 import com.metrolist.music.ui.component.Material3SettingsItem
 import com.metrolist.music.utils.rememberPreference
-import timber.log.Timber
+import kotlin.ranges.ClosedFloatingPointRange
 
-/**
- * EQ Screen - Manage and select EQ profiles
- */
-@SuppressLint("LocalContextGetResourceValueCall")
 @Composable
-fun EqScreen(
-    viewModel: EQViewModel = hiltViewModel(),
-    playbackState: PlaybackState? = null
-) {
+fun EqScreen(viewModel: EQViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    val playerConnection = LocalPlayerConnection.current
+    var showResetDialog by remember { mutableStateOf(false) }
 
-    var showError by remember { mutableStateOf<String?>(null) }
-
-    // Activity result launcher for system equalizer
-    val activityResultLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { }
-
-    // File picker for custom EQ import
-    val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        if (uri != null) {
-            try {
-                val contentResolver = context.contentResolver
-
-                // Extract file name from URI
-                var fileName = "custom_eq.txt"
-                contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val displayNameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                        if (displayNameIndex >= 0) {
-                            val name = cursor.getString(displayNameIndex)
-                            if (!name.isNullOrBlank()) {
-                                fileName = name
-                            }
-                        }
-                    }
-                }
-
-                val inputStream = contentResolver.openInputStream(uri)
-
-                if (inputStream != null) {
-                    viewModel.importCustomProfile(
-                        fileName = fileName,
-                        inputStream = inputStream,
-                        onSuccess = {
-                            Timber.d("Custom EQ profile imported successfully: $fileName")
-                        },
-                        onError = { error ->
-                            Timber.d("Error: Unable to import Custom EQ profile: $fileName")
-                            showError = context.getString(R.string.import_error_title) + ": " + error.message
-                        })
-                } else {
-                    showError = context.getString(R.string.error_file_read)
-                }
-            } catch (e: Exception) {
-                showError = context.getString(R.string.error_file_open, e.message)
-            }
-        }
-    }
-
-    EqScreenContent(
-        viewModel = viewModel,
-        state = state,
-        profiles = state.profiles,
-        activeProfileId = state.activeProfileId,
-        upmixEnabled = state.upmixEnabled,
-        upmixIntensity = state.upmixIntensity,
-        upmixMode = state.upmixMode,
-        upmixBassLevel = state.upmixBassLevel,
-        upmixLfeCutoff = state.upmixLfeCutoff,
-        upmixCenterHpf = state.upmixCenterHpf,
-        upmixCenterLpf = state.upmixCenterLpf,
-        upmixSurroundHpf = state.upmixSurroundHpf,
-        upmixSurroundLpf = state.upmixSurroundLpf,
-        onUpmixEnabledChanged = { viewModel.setUpmixEnabled(it) },
-        onUpmixIntensityChanged = { viewModel.setUpmixIntensity(it) },
-        onUpmixModeChanged = { viewModel.setUpmixMode(it) },
-        onUpmixBassLevelChanged = { viewModel.setUpmixBassLevel(it) },
-        onUpmixLfeCutoffChanged = { viewModel.setUpmixLfeCutoff(it) },
-        onUpmixCenterHpfChanged = { viewModel.setUpmixCenterCutoffs(it, state.upmixCenterLpf) },
-        onUpmixSurroundLpfChanged = { viewModel.setUpmixSurroundCutoffs(state.upmixSurroundHpf, it) },
-        onProfileSelected = { viewModel.selectProfile(it) },
-        onImportCustomEQ = {
-            // Launch file picker for .txt files
-            filePickerLauncher.launch("text/plain")
-        },
-        onOpenSystemEqualizer = {
-            playerConnection?.let { connection ->
-                val intent = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
-                    putExtra(
-                        AudioEffect.EXTRA_AUDIO_SESSION,
-                        connection.player.audioSessionId
-                    )
-                    putExtra(
-                        AudioEffect.EXTRA_PACKAGE_NAME,
-                        context.packageName
-                    )
-                    putExtra(
-                        AudioEffect.EXTRA_CONTENT_TYPE,
-                        AudioEffect.CONTENT_TYPE_MUSIC
-                    )
-                }
-                if (intent.resolveActivity(context.packageManager) != null) {
-                    activityResultLauncher.launch(intent)
-                }
-            }
-        },
-        onDeleteProfile = { viewModel.deleteProfile(it) }
-    )
-
-    // Error dialog
-    if (showError != null) {
-        AlertDialog(
-            onDismissRequest = { showError = null },
-            title = {
-                Text(stringResource(R.string.import_error_title))
-            },
-            text = {
-                Text(showError ?: "")
-            },
-            confirmButton = {
-                TextButton(onClick = { showError = null }) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            }
-        )
-    }
-
-    // Error dialog for apply failure
-    if (state.error != null) {
-        AlertDialog(
-            onDismissRequest = { viewModel.clearError() },
-            title = {
-                Text(stringResource(R.string.error_title))
-            },
-            text = {
-                Text(stringResource(R.string.error_eq_apply_failed, state.error ?: ""))
-            },
-            confirmButton = {
-                TextButton(onClick = { viewModel.clearError() }) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            }
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EqScreenContent(
-    viewModel: EQViewModel,
-    state: EQState,
-    profiles: List<SavedEQProfile>,
-    activeProfileId: String?,
-    upmixEnabled: Boolean,
-    upmixIntensity: Float,
-    upmixMode: UpmixAudioProcessor.UpmixMode,
-    upmixBassLevel: Float = UpmixAudioProcessor.DEFAULT_BASS_LEVEL,
-    upmixLfeCutoff: Float = UpmixAudioProcessor.DEFAULT_LFE_CUTOFF,
-    upmixCenterHpf: Float = UpmixAudioProcessor.DEFAULT_CENTER_HPF_CUTOFF,
-    upmixCenterLpf: Float = UpmixAudioProcessor.DEFAULT_CENTER_LPF_CUTOFF,
-    upmixSurroundHpf: Float = UpmixAudioProcessor.DEFAULT_SURROUND_HPF_CUTOFF,
-    upmixSurroundLpf: Float = UpmixAudioProcessor.DEFAULT_SURROUND_LPF_CUTOFF,
-    onUpmixEnabledChanged: (Boolean) -> Unit,
-    onUpmixIntensityChanged: (Float) -> Unit,
-    onUpmixModeChanged: (UpmixAudioProcessor.UpmixMode) -> Unit,
-    onUpmixBassLevelChanged: (Float) -> Unit = {},
-    onUpmixLfeCutoffChanged: (Float) -> Unit = {},
-    onUpmixCenterHpfChanged: (Float) -> Unit = {},
-    onUpmixSurroundLpfChanged: (Float) -> Unit = {},
-    onProfileSelected: (String?) -> Unit,
-    onImportCustomEQ: () -> Unit,
-    onOpenSystemEqualizer: () -> Unit,
-    onDeleteProfile: (String) -> Unit,
-) {
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -275,139 +81,96 @@ private fun EqScreenContent(
         modifier = Modifier
             .fillMaxWidth(0.9f)
             .heightIn(max = 600.dp)
-            .padding(vertical = 24.dp)
+            .padding(vertical = 24.dp),
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(bottom = 16.dp)
+            contentPadding = PaddingValues(bottom = 16.dp),
         ) {
-            // Header
             item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                        .padding(start = 24.dp, end = 12.dp, top = 16.dp, bottom = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Column {
-                        Text(
-                            text = stringResource(R.string.equalizer_header),
-                            style = MaterialTheme.typography.headlineSmall
+                    Text(
+                        text = stringResource(R.string.equalizer_header),
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
+                    IconButton(onClick = { showResetDialog = true }) {
+                        Icon(
+                            painter = painterResource(R.drawable.refresh),
+                            contentDescription = stringResource(R.string.reset),
                         )
-                        Text(
-                            text = pluralStringResource(
-                                id = R.plurals.profiles_count,
-                                count = profiles.size,
-                                profiles.size
-                            ),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Row {
-                        IconButton(onClick = onImportCustomEQ) {
-                            Icon(
-                                painter = painterResource(R.drawable.add),
-                                contentDescription = stringResource(R.string.import_profile)
-                            )
-                        }
-                        IconButton(onClick = onOpenSystemEqualizer) {
-                            Icon(
-                                painter = painterResource(R.drawable.equalizer),
-                                contentDescription = stringResource(R.string.system_equalizer)
-                            )
-                        }
                     }
                 }
             }
 
-            // AutoEq section
-            item { HorizontalDivider() }
-            item {
-                AutoEqSection(viewModel = viewModel, state = state)
-            }
             item { HorizontalDivider() }
 
-            // Upmix surround section (includes 7.1 channel routing when expanded)
+            item { AutoEqSection(viewModel = viewModel, state = state) }
+
+            item { HorizontalDivider() }
+
             item {
                 UpmixSection(
-                    enabled = upmixEnabled,
-                    intensity = upmixIntensity,
-                    mode = upmixMode,
-                    bassLevel = upmixBassLevel,
-                    lfeCutoff = upmixLfeCutoff,
-                    centerHpf = upmixCenterHpf,
-                    surroundLpf = upmixSurroundLpf,
-                    onEnabledChanged = onUpmixEnabledChanged,
-                    onIntensityChanged = onUpmixIntensityChanged,
-                    onModeChanged = onUpmixModeChanged,
-                    onBassLevelChanged = onUpmixBassLevelChanged,
-                    onLfeCutoffChanged = onUpmixLfeCutoffChanged,
-                    onCenterHpfChanged = onUpmixCenterHpfChanged,
-                    onSurroundLpfChanged = onUpmixSurroundLpfChanged,
+                    enabled = state.upmixEnabled,
+                    intensity = state.upmixIntensity,
+                    mode = state.upmixMode,
+                    bassLevel = state.upmixBassLevel,
+                    lfeCutoff = state.upmixLfeCutoff,
+                    centerHpf = state.upmixCenterHpf,
+                    surroundLpf = state.upmixSurroundLpf,
+                    onEnabledChanged = { viewModel.setUpmixEnabled(it) },
+                    onIntensityChanged = { viewModel.setUpmixIntensity(it) },
+                    onModeChanged = { viewModel.setUpmixMode(it) },
+                    onBassLevelChanged = { viewModel.setUpmixBassLevel(it) },
+                    onLfeCutoffChanged = { viewModel.setUpmixLfeCutoff(it) },
+                    onCenterHpfChanged = {
+                        viewModel.setUpmixCenterCutoffs(it, state.upmixCenterLpf)
+                    },
+                    onSurroundLpfChanged = {
+                        viewModel.setUpmixSurroundCutoffs(state.upmixSurroundHpf, it)
+                    },
                 )
-            }
-            item { HorizontalDivider() }
-
-            // "No Equalization" option
-            item {
-                NoEqualizationItem(
-                    isSelected = activeProfileId == null,
-                    onSelected = { onProfileSelected(null) }
-                )
-            }
-
-            // Custom profiles only
-            val customProfiles = profiles.filter { it.isCustom }
-            if (customProfiles.isNotEmpty()) {
-                items(customProfiles) { profile ->
-                    EQProfileItem(
-                        profile = profile,
-                        isSelected = activeProfileId == profile.id,
-                        onSelected = { onProfileSelected(profile.id) },
-                        onDelete = { onDeleteProfile(profile.id) }
-                    )
-                }
-            }
-
-            // Empty state when no custom profiles
-            if (customProfiles.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.equalizer),
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = stringResource(R.string.no_profiles),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(onClick = onImportCustomEQ) {
-                                Text(stringResource(R.string.import_profile))
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedButton(onClick = onOpenSystemEqualizer) {
-                                Text(stringResource(R.string.system_equalizer))
-                            }
-                        }
-                    }
-                }
             }
         }
+    }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text(stringResource(R.string.reset)) },
+            text = { Text(stringResource(R.string.reset_eq_confirmation)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.resetAll()
+                    showResetDialog = false
+                }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
+    }
+
+    if (state.error != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearError() },
+            title = { Text(stringResource(R.string.error_title)) },
+            text = { Text(state.error ?: "") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearError() }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+        )
     }
 }
 
@@ -416,11 +179,11 @@ private fun EqScreenContent(
 @Composable
 private fun AutoEqSection(
     viewModel: EQViewModel,
-    state: EQState
+    state: EQState,
 ) {
     var isSearchExpanded by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+    Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -464,6 +227,7 @@ private fun AutoEqSection(
         AnimatedVisibility(visible = isSearchExpanded) {
             Column {
                 Spacer(modifier = Modifier.height(8.dp))
+
                 OutlinedTextField(
                     value = state.autoEqSearchQuery,
                     onValueChange = { viewModel.onAutoEqQueryChanged(it) },
@@ -509,19 +273,19 @@ private fun UpmixSection(
     enabled: Boolean,
     intensity: Float,
     mode: UpmixAudioProcessor.UpmixMode,
-    bassLevel: Float = UpmixAudioProcessor.DEFAULT_BASS_LEVEL,
-    lfeCutoff: Float = UpmixAudioProcessor.DEFAULT_LFE_CUTOFF,
-    centerHpf: Float = UpmixAudioProcessor.DEFAULT_CENTER_HPF_CUTOFF,
-    surroundLpf: Float = UpmixAudioProcessor.DEFAULT_SURROUND_LPF_CUTOFF,
+    bassLevel: Float,
+    lfeCutoff: Float,
+    centerHpf: Float,
+    surroundLpf: Float,
     onEnabledChanged: (Boolean) -> Unit,
     onIntensityChanged: (Float) -> Unit,
     onModeChanged: (UpmixAudioProcessor.UpmixMode) -> Unit,
-    onBassLevelChanged: (Float) -> Unit = {},
-    onLfeCutoffChanged: (Float) -> Unit = {},
-    onCenterHpfChanged: (Float) -> Unit = {},
-    onSurroundLpfChanged: (Float) -> Unit = {},
+    onBassLevelChanged: (Float) -> Unit,
+    onLfeCutoffChanged: (Float) -> Unit,
+    onCenterHpfChanged: (Float) -> Unit,
+    onSurroundLpfChanged: (Float) -> Unit,
 ) {
-    Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+    Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -544,79 +308,84 @@ private fun UpmixSection(
             )
         }
 
-        if (enabled) {
-            Spacer(modifier = Modifier.height(12.dp))
+        AnimatedVisibility(visible = enabled) {
+            Column {
+                Spacer(modifier = Modifier.height(12.dp))
 
-            Text(
-                text = stringResource(R.string.upmix_mode_label),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = mode == UpmixAudioProcessor.UpmixMode.SURROUND_5_1,
-                    onClick = { onModeChanged(UpmixAudioProcessor.UpmixMode.SURROUND_5_1) },
-                    label = { Text(stringResource(R.string.upmix_mode_5_1)) },
+                Text(
+                    text = stringResource(R.string.upmix_mode_label),
+                    style = MaterialTheme.typography.bodyMedium,
                 )
-                FilterChip(
-                    selected = mode == UpmixAudioProcessor.UpmixMode.SURROUND_7_1,
-                    onClick = { onModeChanged(UpmixAudioProcessor.UpmixMode.SURROUND_7_1) },
-                    label = { Text(stringResource(R.string.upmix_mode_7_1)) },
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = mode == UpmixAudioProcessor.UpmixMode.SURROUND_5_1,
+                        onClick = { onModeChanged(UpmixAudioProcessor.UpmixMode.SURROUND_5_1) },
+                        label = { Text(stringResource(R.string.upmix_mode_5_1)) },
+                    )
+                    FilterChip(
+                        selected = mode == UpmixAudioProcessor.UpmixMode.SURROUND_7_1,
+                        onClick = { onModeChanged(UpmixAudioProcessor.UpmixMode.SURROUND_7_1) },
+                        label = { Text(stringResource(R.string.upmix_mode_7_1)) },
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                SliderRow(
+                    label = stringResource(R.string.upmix_intensity_label),
+                    value = intensity,
+                    range = 0f..1f,
+                    onValueChange = onIntensityChanged,
+                    formatValue = { "${(it * 100).toInt()}%" },
                 )
-            }
+                SliderRow(
+                    label = stringResource(R.string.upmix_bass_level),
+                    value = bassLevel,
+                    range = 0f..1f,
+                    onValueChange = onBassLevelChanged,
+                    formatValue = { "${(it * 100).toInt()}%" },
+                )
+                SliderRow(
+                    label = stringResource(R.string.upmix_lfe_crossover),
+                    value = lfeCutoff,
+                    range = 40f..250f,
+                    onValueChange = onLfeCutoffChanged,
+                    formatValue = { "${it.toInt()} Hz" },
+                )
+                SliderRow(
+                    label = stringResource(R.string.upmix_center_hpf),
+                    value = centerHpf,
+                    range = 40f..300f,
+                    onValueChange = onCenterHpfChanged,
+                    formatValue = { "${it.toInt()} Hz" },
+                )
+                SliderRow(
+                    label = stringResource(R.string.upmix_surround_lpf),
+                    value = surroundLpf,
+                    range = 2000f..15000f,
+                    onValueChange = onSurroundLpfChanged,
+                    formatValue = { "${it.toInt()} Hz" },
+                )
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-            UpmixSliderRow(
-                label = stringResource(R.string.upmix_intensity_label),
-                value = intensity,
-                range = 0f..1f,
-                onValueChange = onIntensityChanged,
-                formatValue = { "${(it * 100).toInt()}%" },
-            )
-            UpmixSliderRow(
-                label = stringResource(R.string.upmix_bass_level),
-                value = bassLevel,
-                range = 0f..1f,
-                onValueChange = onBassLevelChanged,
-                formatValue = { "${(it * 100).toInt()}%" },
-            )
-            UpmixSliderRow(
-                label = stringResource(R.string.upmix_lfe_crossover),
-                value = lfeCutoff,
-                range = 40f..250f,
-                onValueChange = onLfeCutoffChanged,
-                formatValue = { "${it.toInt()} Hz" },
-            )
-            UpmixSliderRow(
-                label = stringResource(R.string.upmix_center_hpf),
-                value = centerHpf,
-                range = 40f..300f,
-                onValueChange = onCenterHpfChanged,
-                formatValue = { "${it.toInt()} Hz" },
-            )
-            UpmixSliderRow(
-                label = stringResource(R.string.upmix_surround_lpf),
-                value = surroundLpf,
-                range = 2000f..15000f,
-                onValueChange = onSurroundLpfChanged,
-                formatValue = { "${it.toInt()} Hz" },
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-            var isChannelConfigExpanded by remember { mutableStateOf(false) }
-            OutlinedButton(
-                onClick = { isChannelConfigExpanded = !isChannelConfigExpanded },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.upmix_71_channels_group))
-            }
-            AnimatedVisibility(visible = isChannelConfigExpanded) {
-                UpmixChannelConfiguration()
+                var isChannelConfigExpanded by remember { mutableStateOf(false) }
+                OutlinedButton(
+                    onClick = { isChannelConfigExpanded = !isChannelConfigExpanded },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.upmix_71_channels_group))
+                }
+                AnimatedVisibility(visible = isChannelConfigExpanded) {
+                    UpmixChannelConfiguration()
+                }
             }
         }
     }
 }
+
+// --- CHANNEL CONFIGURATION ---
 
 private data class ChannelDef(
     val nameRes: Int,
@@ -635,7 +404,6 @@ private val UPMIX_CHANNELS = listOf(
     ChannelDef(R.string.upmix_71_ch_sr, Upmix71DistanceSRKey, Upmix71TypeSRKey),
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun UpmixChannelConfiguration() {
     Material3SettingsGroup(
@@ -678,7 +446,7 @@ private fun UpmixChannelSettingsItem(ch: ChannelDef): Material3SettingsItem {
                     text = stringResource(R.string.upmix_71_audio_type),
                     style = MaterialTheme.typography.bodySmall,
                 )
-                UpmixChannelTypeDropdown(
+                ChannelTypeDropdown(
                     selected = typeStr,
                     onSelected = onTypeStrChange,
                 )
@@ -689,7 +457,7 @@ private fun UpmixChannelSettingsItem(ch: ChannelDef): Material3SettingsItem {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun UpmixChannelTypeDropdown(
+private fun ChannelTypeDropdown(
     selected: String,
     onSelected: (String) -> Unit,
 ) {
@@ -702,7 +470,9 @@ private fun UpmixChannelTypeDropdown(
         UpmixAudioProcessor.CHANNEL_TYPE_BASS to R.string.upmix_71_type_bass,
         UpmixAudioProcessor.CHANNEL_TYPE_SILENT to R.string.upmix_71_type_silent,
     )
-    val currentLabel = typeEntries.firstOrNull { it.first == selected }?.second ?: R.string.upmix_71_type_default
+    val currentLabel = typeEntries.firstOrNull { it.first == selected }?.second
+        ?: R.string.upmix_71_type_default
+
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = it },
@@ -733,8 +503,10 @@ private fun UpmixChannelTypeDropdown(
     }
 }
 
+// --- SHARED COMPONENTS ---
+
 @Composable
-private fun UpmixSliderRow(
+private fun SliderRow(
     label: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
@@ -762,106 +534,6 @@ private fun UpmixSliderRow(
             onValueChange = onValueChange,
             valueRange = range,
             modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
-// --- HELPER COMPOSABLES ---
-
-@Composable
-private fun NoEqualizationItem(
-    isSelected: Boolean,
-    onSelected: () -> Unit
-) {
-    ListItem(
-        headlineContent = {
-            Text(
-                stringResource(R.string.eq_disabled),
-                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-            )
-        },
-        leadingContent = {
-            RadioButton(
-                selected = isSelected,
-                onClick = onSelected
-            )
-        },
-        modifier = Modifier
-            .clickable(onClick = onSelected)
-            .padding(horizontal = 8.dp) // align with design
-    )
-}
-
-@Composable
-private fun EQProfileItem(
-    profile: SavedEQProfile,
-    isSelected: Boolean,
-    onSelected: () -> Unit,
-    onDelete: () -> Unit
-) {
-    var showDeleteDialog by remember { mutableStateOf(false) }
-
-    ListItem(
-        headlineContent = {
-            Text(
-                text = profile.deviceModel,
-                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-            )
-        },
-        supportingContent = {
-            Text(
-                pluralStringResource(
-                    id = R.plurals.band_count,
-                    count = profile.bands.size,
-                    profile.bands.size
-                )
-            )
-        },
-        leadingContent = {
-            RadioButton(
-                selected = isSelected,
-                onClick = onSelected
-            )
-        },
-        trailingContent = {
-            IconButton(onClick = { showDeleteDialog = true }) {
-                Icon(
-                    painter = painterResource(R.drawable.delete),
-                    contentDescription = stringResource(R.string.delete_profile_desc),
-                    tint = MaterialTheme.colorScheme.error
-                )
-            }
-        },
-        modifier = Modifier
-            .clickable(onClick = onSelected)
-            .padding(horizontal = 8.dp)
-    )
-
-    // Delete confirmation dialog
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text(stringResource(R.string.delete_profile_desc)) },
-            text = {
-                Text(
-                    stringResource(R.string.delete_profile_confirmation, profile.name)
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onDelete()
-                        showDeleteDialog = false
-                    }
-                ) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text(stringResource(android.R.string.cancel))
-                }
-            }
         )
     }
 }

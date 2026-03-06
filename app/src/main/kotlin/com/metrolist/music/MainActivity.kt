@@ -212,6 +212,7 @@ class MainActivity : ComponentActivity() {
         private const val ACTION_SEARCH = "com.metrolist.music.action.SEARCH"
         private const val ACTION_LIBRARY = "com.metrolist.music.action.LIBRARY"
         const val ACTION_RECOGNITION = "com.metrolist.music.action.RECOGNITION"
+        const val EXTRA_AUTO_START_RECOGNITION = "com.metrolist.music.extra.AUTO_START_RECOGNITION"
     }
 
     @Inject

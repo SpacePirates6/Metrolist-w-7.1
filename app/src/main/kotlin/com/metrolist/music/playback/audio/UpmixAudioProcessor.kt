@@ -11,6 +11,7 @@ import androidx.media3.common.util.UnstableApi
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -407,7 +408,20 @@ class UpmixAudioProcessor : AudioProcessor {
     }
 
     private fun clampToShort(value: Float): Short =
-        (value * SHORT_MAX).coerceIn(-SHORT_MAX, SHORT_MAX - 1f).toInt().toShort()
+        (softLimit(value) * SHORT_MAX).toInt().coerceIn(-32768, 32767).toShort()
+
+    /**
+     * Soft limiter: transparent below the knee, smooth saturation above.
+     * Output is bounded to (-1.0, 1.0), preventing the harsh odd-harmonic
+     * distortion that hard clipping produces on high-frequency content.
+     */
+    private fun softLimit(sample: Float): Float {
+        val magnitude = abs(sample)
+        if (magnitude <= LIMITER_KNEE) return sample
+        val sign = if (sample >= 0f) 1f else -1f
+        val excess = magnitude - LIMITER_KNEE
+        return sign * (LIMITER_KNEE + LIMITER_HEADROOM * excess / (LIMITER_HEADROOM + excess))
+    }
 
     // ── Internal DSP primitives ─────────────────────────────────────────────
 
@@ -576,5 +590,8 @@ class UpmixAudioProcessor : AudioProcessor {
         private const val DELAY_BR_MS = 32f
         private const val DELAY_SL_MS = 12f
         private const val DELAY_SR_MS = 16f
+
+        private const val LIMITER_KNEE = 0.85f
+        private const val LIMITER_HEADROOM = 1f - LIMITER_KNEE
     }
 }

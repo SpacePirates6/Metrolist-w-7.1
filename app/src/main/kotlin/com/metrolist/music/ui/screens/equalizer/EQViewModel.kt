@@ -239,6 +239,49 @@ class EQViewModel @Inject constructor(
     }
 
     /**
+     * Reset all EQ and upmix settings to factory defaults.
+     */
+    fun resetAll() {
+        viewModelScope.launch {
+            equalizerService.disable()
+            eqProfileRepository.setActiveProfile(null)
+
+            context.dataStore.edit { prefs ->
+                prefs.remove(AutoEqEnabledKey)
+                prefs.remove(AutoEqNameKey)
+                prefs.remove(AutoEqDataKey)
+
+                prefs.remove(UpmixEnabledKey)
+                prefs.remove(UpmixIntensityKey)
+                prefs.remove(UpmixModeKey)
+                prefs.remove(UpmixBassLevelKey)
+                prefs.remove(UpmixLfeCutoffKey)
+                prefs.remove(UpmixCenterHpfKey)
+                prefs.remove(UpmixCenterLpfKey)
+                prefs.remove(UpmixSurroundHpfKey)
+                prefs.remove(UpmixSurroundLpfKey)
+
+                prefs.remove(Upmix71DistanceFLKey)
+                prefs.remove(Upmix71DistanceFRKey)
+                prefs.remove(Upmix71DistanceFCKey)
+                prefs.remove(Upmix71DistanceLFEKey)
+                prefs.remove(Upmix71DistanceBLKey)
+                prefs.remove(Upmix71DistanceBRKey)
+                prefs.remove(Upmix71DistanceSLKey)
+                prefs.remove(Upmix71DistanceSRKey)
+                prefs.remove(Upmix71TypeFLKey)
+                prefs.remove(Upmix71TypeFRKey)
+                prefs.remove(Upmix71TypeFCKey)
+                prefs.remove(Upmix71TypeLFEKey)
+                prefs.remove(Upmix71TypeBLKey)
+                prefs.remove(Upmix71TypeBRKey)
+                prefs.remove(Upmix71TypeSLKey)
+                prefs.remove(Upmix71TypeSRKey)
+            }
+        }
+    }
+
+    /**
      * Observe upmix keys in DataStore and push them into [_state] and [upmixService].
      */
     private fun loadUpmixSettings() {

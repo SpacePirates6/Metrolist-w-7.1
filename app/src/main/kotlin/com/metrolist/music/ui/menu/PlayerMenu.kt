@@ -94,6 +94,7 @@ import com.metrolist.music.ui.component.NewActionGrid
 import com.metrolist.music.ui.component.VolumeSlider
 import com.metrolist.music.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.log2
 import kotlin.math.pow
@@ -617,8 +618,11 @@ fun PlayerMenu(
                                     )
                                 },
                                 onClick = {
-                                    navController.navigate("equalizer")
                                     onDismiss()
+                                    coroutineScope.launch {
+                                        delay(200)
+                                        navController.navigate("equalizer")
+                                    }
                                 }
                             )
                         )

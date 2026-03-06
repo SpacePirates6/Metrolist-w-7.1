@@ -8,6 +8,7 @@ import com.metrolist.music.eq.data.ParametricEQBand
 import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.abs
 import kotlin.math.pow
 
 /**
@@ -48,6 +49,11 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
     companion object {
         private const val TAG = "CustomEqualizerAudioProcessor"
         private val EMPTY_BUFFER: ByteBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())
+
+        private const val LIMITER_KNEE = 0.85
+        private const val LIMITER_HEADROOM = 1.0 - LIMITER_KNEE
+
+        private const val NYQUIST_GUARD_RATIO = 0.45
     }
 
     /**
@@ -114,12 +120,14 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
 
     /**
      * Create biquad filters from ParametricEQ bands.
-     * Only creates filters for enabled bands below Nyquist frequency.
+     * Skips disabled bands and those near or above Nyquist where biquad warping
+     * causes unpredictable resonances.
      */
     private fun createFiltersFromBands(bands: List<ParametricEQBand>): List<BiquadFilter> {
         if (sampleRate == 0) return emptyList()
+        val nyquistGuard = sampleRate * NYQUIST_GUARD_RATIO
         return bands
-            .filter { it.enabled && it.frequency < sampleRate / 2.0 }
+            .filter { it.enabled && it.frequency < nyquistGuard }
             .map { band ->
                 BiquadFilter(
                     sampleRate = sampleRate,
@@ -130,6 +138,21 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
                 )
             }
     }
+
+    /**
+     * Soft limiter that smoothly compresses signals above the knee threshold
+     * instead of hard-clipping. Output is bounded to (-1.0, 1.0).
+     */
+    private fun softLimit(sample: Double): Double {
+        val magnitude = abs(sample)
+        if (magnitude <= LIMITER_KNEE) return sample
+        val sign = if (sample >= 0.0) 1.0 else -1.0
+        val excess = magnitude - LIMITER_KNEE
+        return sign * (LIMITER_KNEE + LIMITER_HEADROOM * excess / (LIMITER_HEADROOM + excess))
+    }
+
+    private fun toShort(sample: Double): Short =
+        (softLimit(sample) * 32768.0).toInt().coerceIn(-32768, 32767).toShort()
 
     override fun configure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         sampleRate = inputAudioFormat.sampleRate
@@ -247,9 +270,7 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
                 for (filter in userFilters) {
                     sample = filter.processSample(sample)
                 }
-                output.putShort(
-                    (sample * 32768.0).coerceIn(-32768.0, 32767.0).toInt().toShort(),
-                )
+                output.putShort(toShort(sample))
             } else {
                 var left = input.getShort().toDouble() / 32768.0 * combinedPreamp
                 var right = input.getShort().toDouble() / 32768.0 * combinedPreamp
@@ -265,12 +286,8 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
                     left = l
                     right = r
                 }
-                output.putShort(
-                    (left * 32768.0).coerceIn(-32768.0, 32767.0).toInt().toShort(),
-                )
-                output.putShort(
-                    (right * 32768.0).coerceIn(-32768.0, 32767.0).toInt().toShort(),
-                )
+                output.putShort(toShort(left))
+                output.putShort(toShort(right))
             }
         }
     }
@@ -322,9 +339,7 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
                     else -> rawSample * combinedPreamp
                 }
 
-                val outShort =
-                    (processedSample * 32768.0).coerceIn(-32768.0, 32767.0).toInt().toShort()
-                output.putShort(outShort)
+                output.putShort(toShort(processedSample))
             }
         }
     }

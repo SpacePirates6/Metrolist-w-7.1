@@ -471,6 +471,7 @@
         <item quantity="other">%d Profiles</item>
     </plurals>
     <string name="equalizer_header">Equalizer</string>
+    <string name="reset_eq_confirmation">Reset all equalizer and upmix settings to their defaults?</string>
     <string name="no_profiles">No equalizer profiles</string>
     <string name="import_profile">Import Profile</string>
     <string name="system_equalizer">System Equalizer</string>
