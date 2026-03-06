@@ -69,6 +69,14 @@
     <string name="delete_playlist_desc">Remove this playlist permanently</string>
     <string name="sync_playlist_desc">Sync playlist with YouTube Music</string>
     <string name="copy_link">Copy link</string>
+    <string name="export_playlist">Export playlist</string>
+    <string name="export_failed">Failed to export playlist</string>
+    <string name="export_success">Playlist exported successfully</string>
+    <string name="export_option_share">Share</string>
+    <string name="export_option_save">Save to Documents</string>
+    <string name="export_option_title">How would you like to export the playlist?</string>
+    <string name="export_as_csv">Export as CSV</string>
+    <string name="export_as_m3u">Export as M3U</string>
     <string name="select">Select all</string>
     <string name="like_all">Like all</string>
     <string name="dislike_all">Dislike all</string>
@@ -565,6 +573,7 @@
     <string name="widget_recognizer_channel_name">Music Recognition</string>
     <string name="widget_recognizer_channel_desc">Shows a notification while identifying a song from the widget</string>
     <string name="widget_recognizer_notification_text">Recording audio to identify the song…</string>
+    <string name="qs_tile_music_recognizer">Recognize Music</string>
 
     <!-- Player Client Settings -->
     <string name="player_client">Player client</string>

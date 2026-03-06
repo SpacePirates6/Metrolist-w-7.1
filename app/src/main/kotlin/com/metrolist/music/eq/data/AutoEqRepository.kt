@@ -15,9 +15,9 @@ import javax.inject.Singleton
  * Uses the public Git Trees API (no token required) to index all profiles locally for instant search.
  */
 @Singleton
-class AutoEqRepository @Inject constructor(
-    private val okHttpClient: OkHttpClient
-) {
+class AutoEqRepository @Inject constructor() {
+
+    private val okHttpClient = OkHttpClient()
     private var fileIndex: List<AutoEqMatch> = emptyList()
 
     /**

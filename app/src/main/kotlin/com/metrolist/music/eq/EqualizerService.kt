@@ -22,6 +22,8 @@ class EqualizerService @Inject constructor() {
     private val audioProcessors = mutableListOf<CustomEqualizerAudioProcessor>()
     private var pendingProfile: SavedEQProfile? = null
     private var shouldDisable: Boolean = false
+    private var autoEqEnabled: Boolean = false
+    private var autoEqProfile: ParametricEQ? = null
 
     companion object {
         private const val TAG = "EqualizerService"
@@ -40,10 +42,41 @@ class EqualizerService @Inject constructor() {
         if (shouldDisable) {
             processor.disable()
             // Don't clear shouldDisable here, as we might add more processors
+        } else if (autoEqEnabled && autoEqProfile != null) {
+            processor.applyProfile(autoEqProfile!!)
         } else if (pendingProfile != null) {
             val profile = pendingProfile!!
             applyProfileToProcessor(processor, profile)
             // Don't clear pendingProfile here
+        }
+    }
+
+    /**
+     * Enable or disable the AutoEq hardware layer.
+     */
+    @OptIn(UnstableApi::class)
+    fun setAutoEqEnabled(enabled: Boolean) {
+        autoEqEnabled = enabled
+        audioProcessors.forEach { processor ->
+            when {
+                shouldDisable -> processor.disable()
+                autoEqEnabled && autoEqProfile != null -> processor.applyProfile(autoEqProfile!!)
+                pendingProfile != null -> applyProfileToProcessor(processor, pendingProfile!!)
+                else -> processor.disable()
+            }
+        }
+    }
+
+    /**
+     * Set the AutoEq parametric profile (from AutoEQ project).
+     */
+    @OptIn(UnstableApi::class)
+    fun setAutoEqProfile(profile: ParametricEQ?) {
+        autoEqProfile = profile
+        if (autoEqEnabled && profile != null) {
+            audioProcessors.forEach { it.applyProfile(profile) }
+        } else if (!autoEqEnabled && pendingProfile == null && !shouldDisable) {
+            audioProcessors.forEach { it.disable() }
         }
     }
 
