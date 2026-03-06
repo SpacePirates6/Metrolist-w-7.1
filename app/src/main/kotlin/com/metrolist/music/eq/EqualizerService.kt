@@ -23,9 +23,6 @@ class EqualizerService @Inject constructor() {
     private var pendingProfile: SavedEQProfile? = null
     private var shouldDisable: Boolean = false
 
-    private var cachedAutoEqEnabled: Boolean = false
-    private var cachedAutoEqProfile: ParametricEQ? = null
-
     companion object {
         private const val TAG = "EqualizerService"
     }
@@ -39,13 +36,14 @@ class EqualizerService @Inject constructor() {
         audioProcessors.add(processor)
         Timber.tag(TAG).d("Audio processor added. Total: ${audioProcessors.size}")
 
-        processor.autoEqEnabled = cachedAutoEqEnabled
-        cachedAutoEqProfile?.let { processor.applyAutoEqProfile(it) }
-
+        // Apply pending profile if one was set before processor was available
         if (shouldDisable) {
             processor.disable()
+            // Don't clear shouldDisable here, as we might add more processors
         } else if (pendingProfile != null) {
-            applyProfileToProcessor(processor, pendingProfile!!)
+            val profile = pendingProfile!!
+            applyProfileToProcessor(processor, profile)
+            // Don't clear pendingProfile here
         }
     }
 
@@ -135,24 +133,6 @@ class EqualizerService @Inject constructor() {
     @OptIn(UnstableApi::class)
     fun isEnabled(): Boolean {
         return audioProcessors.any { it.isEnabled() }
-    }
-
-    /**
-     * Enable or disable the hardware correction (AutoEq) layer.
-     */
-    @OptIn(UnstableApi::class)
-    fun setAutoEqEnabled(enabled: Boolean) {
-        cachedAutoEqEnabled = enabled
-        audioProcessors.forEach { it.autoEqEnabled = enabled }
-    }
-
-    /**
-     * Apply the hardware correction (AutoEq) profile. Pass null to clear.
-     */
-    @OptIn(UnstableApi::class)
-    fun setAutoEqProfile(profile: ParametricEQ?) {
-        cachedAutoEqProfile = profile
-        audioProcessors.forEach { it.applyAutoEqProfile(profile) }
     }
 
     /**

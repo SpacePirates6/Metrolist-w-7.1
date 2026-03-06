@@ -8,13 +8,11 @@ import com.metrolist.music.eq.data.ParametricEQBand
 import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import kotlin.math.abs
 import kotlin.math.pow
 
 /**
- * Custom audio processor for ExoPlayer that applies parametric EQ using biquad filters.
- * Supports filter stacking: hardware correction (AutoEq) runs first, then user preference (custom profile).
- * Uses ParametricEQ format from AutoEQ project.
+ * Custom audio processor for ExoPlayer that applies parametric EQ using biquad filters
+ * Uses ParametricEQ format from AutoEQ project
  */
 @UnstableApi
 @SuppressWarnings("Deprecated")
@@ -24,110 +22,78 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
     private var channelCount = 0
     private var encoding = C.ENCODING_INVALID
     private var isActive = false
+    private var equalizerEnabled = false
 
     private var inputBuffer: ByteBuffer = EMPTY_BUFFER
     private var outputBuffer: ByteBuffer = EMPTY_BUFFER
     private var inputEnded = false
 
-    @Volatile
-    private var userFilters: List<BiquadFilter> = emptyList()
-
-    @Volatile
-    private var autoEqFilters: List<BiquadFilter> = emptyList()
-
-    @Volatile
-    var autoEqEnabled: Boolean = false
-
-    @Volatile
-    private var userPreampGain: Double = 1.0
-
-    @Volatile
-    private var autoEqPreampGain: Double = 1.0
-
-    private var pendingUserProfile: ParametricEQ? = null
+    private var filters: List<BiquadFilter> = emptyList()
+    private var preampGain: Double = 1.0  // Linear preamp gain multiplier
+    private var pendingProfile: ParametricEQ? = null
 
     companion object {
         private const val TAG = "CustomEqualizerAudioProcessor"
         private val EMPTY_BUFFER: ByteBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())
-
-        private const val LIMITER_KNEE = 0.85
-        private const val LIMITER_HEADROOM = 1.0 - LIMITER_KNEE
-
-        private const val NYQUIST_GUARD_RATIO = 0.45
     }
 
     /**
-     * Apply a user EQ profile (Bass Boost, Acoustic, custom, etc.)
+     * Apply an EQ profile
      */
     @Synchronized
     fun applyProfile(parametricEQ: ParametricEQ) {
         if (sampleRate == 0) {
+            // Audio processor not configured yet, store as pending
             Timber.tag(TAG)
-                .d("Audio processor not configured yet. Storing user profile as pending with ${parametricEQ.bands.size} bands")
-            pendingUserProfile = parametricEQ
+                .d("Audio processor not configured yet. Storing profile as pending with ${parametricEQ.bands.size} bands")
+            pendingProfile = parametricEQ
             return
         }
 
-        userPreampGain = 10.0.pow(parametricEQ.preamp / 20.0)
-        userFilters = createFiltersFromBands(parametricEQ.bands)
-        userFilters.forEach { it.reset() }
+        // Convert preamp from dB to linear gain
+        preampGain = 10.0.pow(parametricEQ.preamp / 20.0)
+
+        createFilters(parametricEQ.bands)
+        equalizerEnabled = true
+
+        // Reset filter states to ensure clean transition
+        filters.forEach { it.reset() }
 
         Timber.tag(TAG)
-            .d("Applied user EQ profile with ${userFilters.size} bands and ${parametricEQ.preamp} dB preamp")
+            .d("Applied EQ profile with ${filters.size} bands and ${parametricEQ.preamp} dB preamp")
     }
 
     /**
-     * Apply the hardware correction (AutoEq) profile. Pass null to clear.
-     */
-    @Synchronized
-    fun applyAutoEqProfile(profile: ParametricEQ?) {
-        if (profile == null) {
-            autoEqPreampGain = 1.0
-            autoEqFilters = emptyList()
-            Timber.tag(TAG).d("AutoEq profile cleared")
-            return
-        }
-
-        if (sampleRate == 0) {
-            Timber.tag(TAG).d("Audio processor not configured yet. AutoEq profile will be applied on configure")
-            return
-        }
-
-        autoEqPreampGain = 10.0.pow(profile.preamp / 20.0)
-        autoEqFilters = createFiltersFromBands(profile.bands)
-        autoEqFilters.forEach { it.reset() }
-
-        Timber.tag(TAG)
-            .d("Applied AutoEq profile with ${autoEqFilters.size} bands and ${profile.preamp} dB preamp")
-    }
-
-    /**
-     * Disable the user equalizer (clears user profile only; AutoEq chain is untouched)
+     * Disable the equalizer
      */
     @Synchronized
     fun disable() {
-        userPreampGain = 1.0
-        userFilters = emptyList()
-        pendingUserProfile = null
-        Timber.tag(TAG).d("User equalizer disabled")
+        equalizerEnabled = false
+        filters = emptyList()
+        preampGain = 1.0
+        pendingProfile = null
+        Timber.tag(TAG).d("Equalizer disabled")
     }
 
     /**
-     * Check if any EQ is active (user or AutoEq)
+     * Check if equalizer is enabled
      */
-    fun isEnabled(): Boolean =
-        (autoEqEnabled && autoEqFilters.isNotEmpty()) || userFilters.isNotEmpty()
+    fun isEnabled(): Boolean = equalizerEnabled
 
     /**
-     * Create biquad filters from ParametricEQ bands.
-     * Skips disabled bands and those near or above Nyquist where biquad warping
-     * causes unpredictable resonances.
+     * Create biquad filters from ParametricEQ bands
+     * Only creates filters for enabled bands below Nyquist frequency
+     * Supports PK (peaking), LSC (low-shelf), and HSC (high-shelf) filter types
      */
-    private fun createFiltersFromBands(bands: List<ParametricEQBand>): List<BiquadFilter> {
-        if (sampleRate == 0) return emptyList()
-        val nyquistGuard = sampleRate * NYQUIST_GUARD_RATIO
-        return bands
-            .filter { it.enabled && it.frequency < nyquistGuard }
+    private fun createFilters(bands: List<ParametricEQBand>) {
+        if (sampleRate == 0) {
+            Timber.tag(TAG).w("Cannot create filters: sample rate not set")
+            return
+        }
+
+        // Filter out disabled bands and frequencies above Nyquist limit
+        filters = bands
+            .filter { it.enabled && it.frequency < sampleRate / 2.0 }
             .map { band ->
                 BiquadFilter(
                     sampleRate = sampleRate,
@@ -137,22 +103,10 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
                     filterType = band.filterType
                 )
             }
-    }
 
-    /**
-     * Soft limiter that smoothly compresses signals above the knee threshold
-     * instead of hard-clipping. Output is bounded to (-1.0, 1.0).
-     */
-    private fun softLimit(sample: Double): Double {
-        val magnitude = abs(sample)
-        if (magnitude <= LIMITER_KNEE) return sample
-        val sign = if (sample >= 0.0) 1.0 else -1.0
-        val excess = magnitude - LIMITER_KNEE
-        return sign * (LIMITER_KNEE + LIMITER_HEADROOM * excess / (LIMITER_HEADROOM + excess))
+        Timber.tag(TAG)
+            .d("Created ${filters.size} biquad filters from ${bands.size} bands (PK/LSC/HSC)")
     }
-
-    private fun toShort(sample: Double): Short =
-        (softLimit(sample) * 32768.0).toInt().coerceIn(-32768, 32767).toShort()
 
     override fun configure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         sampleRate = inputAudioFormat.sampleRate
@@ -162,20 +116,20 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
         Timber.tag(TAG)
             .d("Configured: sampleRate=$sampleRate, channels=$channelCount, encoding=$encoding")
 
-        // Apply pending user profile if one exists
-        pendingUserProfile?.let { profile ->
-            userPreampGain = 10.0.pow(profile.preamp / 20.0)
-            userFilters = createFiltersFromBands(profile.bands)
-            pendingUserProfile = null
+        // Apply pending profile if one exists
+        pendingProfile?.let { profile ->
+            preampGain = 10.0.pow(profile.preamp / 20.0)
+            createFilters(profile.bands)
+            equalizerEnabled = true
+            pendingProfile = null
             Timber.tag(TAG)
-                .d("Applied pending user profile with ${userFilters.size} bands")
+                .d("Applied pending profile with ${filters.size} bands and ${profile.preamp} dB preamp")
         }
 
-        if (encoding != C.ENCODING_PCM_16BIT) {
-            throw AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
-        }
-        if (channelCount !in 1..8) {
-            throw AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
+        // Only support 16-bit PCM stereo/mono
+        if (encoding != C.ENCODING_PCM_16BIT || channelCount > 2) {
+            val exception = AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
+            throw exception // Rethrow, unsupported
         }
 
         isActive = true
@@ -185,13 +139,12 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
     override fun isActive(): Boolean = isActive
 
     override fun queueInput(inputBuffer: ByteBuffer) {
-        val hasAutoEq = autoEqEnabled && autoEqFilters.isNotEmpty()
-        val hasUserEq = userFilters.isNotEmpty()
-        if (!hasAutoEq && !hasUserEq) {
+        if (!equalizerEnabled || filters.isEmpty()) {
             // Passthrough mode - directly use input as output
             val remaining = inputBuffer.remaining()
             if (remaining == 0) return
 
+            // Ensure output buffer is large enough
             if (outputBuffer.capacity() < remaining) {
                 outputBuffer = ByteBuffer.allocateDirect(remaining).order(ByteOrder.nativeOrder())
             } else {
@@ -238,108 +191,66 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
     }
 
     /**
-     * Process 16-bit PCM audio through all biquad filters.
-     * Order: combined preamp -> AutoEq (hardware correction) -> user profile.
-     * For 5.1/7.1: FL/BL/SL/FC use left EQ, FR/BR/SR use right EQ, LFE bypassed.
+     * Process 16-bit PCM audio through all biquad filters
      */
     private fun processAudioBuffer16Bit(input: ByteBuffer, output: ByteBuffer) {
-        val combinedPreamp = userPreampGain * (if (autoEqEnabled) autoEqPreampGain else 1.0)
-        val sampleCount = input.remaining() / 2
+        // Ensure we are reading from the current position
+        // Input is ready to be read from position() to limit()
+        // Output is ready to be written to from position()
 
-        if (channelCount == 1 || channelCount == 2) {
-            processMonoOrStereo(input, output, sampleCount, combinedPreamp)
-        } else {
-            processSurround(input, output, sampleCount, combinedPreamp)
-        }
-    }
+        val sampleCount = input.remaining() / 2 // 2 bytes per 16-bit sample
 
-    private fun processMonoOrStereo(
-        input: ByteBuffer,
-        output: ByteBuffer,
-        sampleCount: Int,
-        combinedPreamp: Double,
-    ) {
         repeat(sampleCount / channelCount) {
-            if (channelCount == 1) {
-                var sample = input.getShort().toDouble() / 32768.0 * combinedPreamp
-                if (autoEqEnabled) {
-                    for (filter in autoEqFilters) {
-                        sample = filter.processSample(sample)
-                    }
-                }
-                for (filter in userFilters) {
-                    sample = filter.processSample(sample)
-                }
-                output.putShort(toShort(sample))
-            } else {
-                var left = input.getShort().toDouble() / 32768.0 * combinedPreamp
-                var right = input.getShort().toDouble() / 32768.0 * combinedPreamp
-                if (autoEqEnabled) {
-                    for (filter in autoEqFilters) {
-                        val (l, r) = filter.processStereo(left, right)
-                        left = l
-                        right = r
-                    }
-                }
-                for (filter in userFilters) {
-                    val (l, r) = filter.processStereo(left, right)
-                    left = l
-                    right = r
-                }
-                output.putShort(toShort(left))
-                output.putShort(toShort(right))
-            }
-        }
-    }
+            when (channelCount) {
+                1 -> {
+                    // Mono
+                    val sample = input.getShort().toDouble() / 32768.0 // Normalize to [-1, 1]
+                    var processed = sample
 
-    /**
-     * Process 5.1 or 7.1 surround. Interleave order: FL, FR, FC, LFE, BL, BR, SL, SR.
-     * Left channels (FL, BL, SL, FC) use left EQ. Right channels (FR, BR, SR) use right EQ.
-     * LFE is bypassed to prevent headphone bass-boost from muddying the subwoofer.
-     */
-    private fun processSurround(
-        input: ByteBuffer,
-        output: ByteBuffer,
-        sampleCount: Int,
-        combinedPreamp: Double,
-    ) {
-        val frameCount = sampleCount / channelCount
-        repeat(frameCount) {
-            for (channelIndex in 0 until channelCount) {
-                val rawSample = input.getShort().toDouble() / 32768.0
+                    // Apply all filters in series
+                    for (filter in filters) {
+                        processed = filter.processSample(processed)
+                    }
 
-                val processedSample = when (channelIndex) {
-                    3 -> {
-                        rawSample
-                    }
-                    0, 2, 4, 6 -> {
-                        var sample = rawSample * combinedPreamp
-                        if (autoEqEnabled) {
-                            for (filter in autoEqFilters) {
-                                sample = filter.processSample(sample)
-                            }
-                        }
-                        for (filter in userFilters) {
-                            sample = filter.processSample(sample)
-                        }
-                        sample
-                    }
-                    1, 5, 7 -> {
-                        var sample = rawSample * combinedPreamp
-                        if (autoEqEnabled) {
-                            for (filter in autoEqFilters) {
-                                sample = filter.processRightSample(sample)
-                            }
-                        }
-                        for (filter in userFilters) {
-                            sample = filter.processRightSample(sample)
-                        }
-                        sample
-                    }
-                    else -> rawSample * combinedPreamp
+                    // Apply preamp gain
+                    processed *= preampGain
+
+                    // Clamp and convert back to 16-bit
+                    val outputSample = (processed * 32768.0).coerceIn(-32768.0, 32767.0).toInt().toShort()
+                    output.putShort(outputSample)
                 }
+                2 -> {
+                    // Stereo
+                    val leftSample = input.getShort().toDouble() / 32768.0
+                    val rightSample = input.getShort().toDouble() / 32768.0
 
-                output.putShort(toShort(processedSample))
+                    var processedLeft = leftSample
+                    var processedRight = rightSample
+
+                    // Apply all filters in series
+                    for (filter in filters) {
+                        val (left, right) = filter.processStereo(processedLeft, processedRight)
+                        processedLeft = left
+                        processedRight = right
+                    }
+
+                    // Apply preamp gain
+                    processedLeft *= preampGain
+                    processedRight *= preampGain
+
+                    // Clamp and convert back to 16-bit
+                    val outputLeft = (processedLeft * 32768.0).coerceIn(-32768.0, 32767.0).toInt().toShort()
+                    val outputRight = (processedRight * 32768.0).coerceIn(-32768.0, 32767.0).toInt().toShort()
+
+                    output.putShort(outputLeft)
+                    output.putShort(outputRight)
+                }
+                else -> {
+                    // Should not happen as configure rejects > 2 channels
+                    repeat(channelCount) {
+                        output.putShort(input.getShort())
+                    }
+                }
             }
         }
     }
@@ -359,8 +270,9 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
     override fun flush() {
         outputBuffer = EMPTY_BUFFER
         inputEnded = false
-        userFilters.forEach { it.reset() }
-        autoEqFilters.forEach { it.reset() }
+
+        // Reset filter states
+        filters.forEach { it.reset() }
     }
 
     override fun reset() {
@@ -371,8 +283,7 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
         channelCount = 0
         encoding = C.ENCODING_INVALID
         isActive = false
-        userFilters.forEach { it.reset() }
-        autoEqFilters.forEach { it.reset() }
+        filters.forEach { it.reset() }
     }
 
     override fun queueEndOfStream() {

@@ -1,17 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
-val os = System.getProperty("os.name").lowercase()
-val arch = System.getProperty("os.arch").lowercase()
-val protocClassifier = when {
-    os.contains("win") && arch == "amd64" -> "windows-x86_64"
-    os.contains("win") && arch == "x86" -> "windows-x86_32"
-    os.contains("mac") && arch == "aarch64" -> "osx-aarch_64"
-    os.contains("mac") -> "osx-x86_64"
-    arch == "aarch64" || arch == "arm64" -> "linux-aarch_64"
-    else -> "linux-x86_64"
-}
-
 val localProperties = Properties()
 val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
@@ -165,41 +154,6 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
-val protocVersion = libs.versions.protobuf.get()
-configurations.create("protoc") {
-    isVisible = false
-    isCanBeResolved = true
-    isCanBeConsumed = false
-}
-
-val generateProto = tasks.register<Exec>("generateProto") {
-    val protoDir = rootProject.file("metroproto")
-    val outDir = file("src/main/java")
-    val protoFile = protoDir.resolve("listentogether.proto")
-
-    doFirst {
-        if (!protoFile.exists()) {
-            throw GradleException(
-                "Missing proto file at $protoFile. " +
-                "Did you initialize submodules? Run: git submodule update --init --recursive"
-            )
-        }
-        outDir.mkdirs()
-    }
-
-    val protocArtifact = configurations["protoc"].resolve().single()
-    commandLine(
-        protocArtifact.absolutePath,
-        "--java_out=lite:${outDir.absolutePath}",
-        "--kotlin_out=lite:${outDir.absolutePath}",
-        "-I=${protoDir.absolutePath}",
-        protoFile.absolutePath
-    )
-}
-
-// Ensure proto generation runs before any compilation (preBuild runs first in Android)
-tasks.named("preBuild").configure { dependsOn(generateProto) }
-
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {
         freeCompilerArgs.addAll(
@@ -280,8 +234,6 @@ dependencies {
     // Protobuf for message serialization (lite version for Android)
     implementation(libs.protobuf.javalite)
     implementation(libs.protobuf.kotlin.lite)
-
-    add("protoc", "com.google.protobuf:protoc:$protocVersion:$protocClassifier@exe")
 
     coreLibraryDesugaring(libs.desugaring)
 

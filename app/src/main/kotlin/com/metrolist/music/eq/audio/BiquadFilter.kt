@@ -51,8 +51,10 @@ class BiquadFilter(
             FilterType.PK -> calculatePeakingCoefficients()
             FilterType.LSC -> calculateLowShelfCoefficients()
             FilterType.HSC -> calculateHighShelfCoefficients()
-            FilterType.LPQ -> calculateLowPassCoefficients()
-            FilterType.HPQ -> calculateHighPassCoefficients()
+            else -> {
+                // Handle any unexpected filter type
+                calculatePeakingCoefficients()
+            }
         }
     }
 
@@ -153,56 +155,6 @@ class BiquadFilter(
     }
 
     /**
-     * Calculate low-pass coefficients (LPQ)
-     * Attenuates frequencies above the cutoff; gain parameter is ignored.
-     */
-    private fun calculateLowPassCoefficients() {
-        val omega = 2.0 * PI * frequency / sampleRate
-        val sinOmega = sin(omega)
-        val cosOmega = cos(omega)
-        val alpha = sinOmega / (2.0 * q)
-
-        b0 = (1.0 - cosOmega) / 2.0
-        b1 = 1.0 - cosOmega
-        b2 = (1.0 - cosOmega) / 2.0
-        a0 = 1.0 + alpha
-        a1 = -2.0 * cosOmega
-        a2 = 1.0 - alpha
-
-        b0 /= a0
-        b1 /= a0
-        b2 /= a0
-        a1 /= a0
-        a2 /= a0
-        a0 = 1.0
-    }
-
-    /**
-     * Calculate high-pass coefficients (HPQ)
-     * Attenuates frequencies below the cutoff; gain parameter is ignored.
-     */
-    private fun calculateHighPassCoefficients() {
-        val omega = 2.0 * PI * frequency / sampleRate
-        val sinOmega = sin(omega)
-        val cosOmega = cos(omega)
-        val alpha = sinOmega / (2.0 * q)
-
-        b0 = (1.0 + cosOmega) / 2.0
-        b1 = -(1.0 + cosOmega)
-        b2 = (1.0 + cosOmega) / 2.0
-        a0 = 1.0 + alpha
-        a1 = -2.0 * cosOmega
-        a2 = 1.0 - alpha
-
-        b0 /= a0
-        b1 /= a0
-        b2 /= a0
-        a1 /= a0
-        a2 /= a0
-        a0 = 1.0
-    }
-
-    /**
      * Process a single sample (mono)
      */
     fun processSample(input: Double): Double {
@@ -214,19 +166,6 @@ class BiquadFilter(
         y2L = y1L
         y1L = output
 
-        return output
-    }
-
-    /**
-     * Process a single sample through the right channel only.
-     * Used for per-channel routing in 5.1/7.1.
-     */
-    fun processRightSample(input: Double): Double {
-        val output = b0 * input + b1 * x1R + b2 * x2R - a1 * y1R - a2 * y2R
-        x2R = x1R
-        x1R = input
-        y2R = y1R
-        y1R = output
         return output
     }
 
